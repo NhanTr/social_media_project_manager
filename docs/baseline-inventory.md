@@ -6,6 +6,7 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
 
 | Branch | Commit | Verified contents | Status |
 | --- | --- | --- | --- |
+| `origin/main` | `98e3939` | Root README only | GitHub default branch |
 | `main` | `3ffef7d` | Root README only | Local branch exists |
 | `dev` | `3ffef7d` | Same baseline as `main` | Local branch exists |
 | `mobile-app` | `7c8705f` | Generated Flutter application for Android and iOS | Local commit exists |
@@ -30,12 +31,16 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
 
 ## Remote observations
 
-- The GitHub `main` ref is readable.
+- The GitHub `main` ref is readable at commit `98e3939`.
+- Local `main` and `dev` point to `3ffef7d`. The local and GitHub root commits
+  have the same initial tree but no shared commit ancestor.
 - The GitHub `dev` and `mobile-app` refs were not available when checked on
   24 September 2026.
 - No backend branch, tag, or commit has been verified.
 - The planned tag `backend-baseline-v0.1.0` must not be created until a
   buildable backend commit is located.
+- Do not force-push `main`. Build publishable branches from `origin/main` and
+  apply the verified local task commits on top.
 
 ## Required evidence before completing LC-S0-01
 
