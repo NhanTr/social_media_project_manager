@@ -7,6 +7,8 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
 | Branch | Commit | Verified contents | Status |
 | --- | --- | --- | --- |
 | `origin/main` | `98e3939` | Root README only | GitHub default branch |
+| `origin/dev` | `98e3939` | Integration baseline from GitHub `main` | Published |
+| `origin/mobile-app` | `67a2760` | Generated Flutter application for Android and iOS | Published and tested |
 | `main` | `3ffef7d` | Root README only | Local branch exists |
 | `dev` | `3ffef7d` | Same baseline as `main` | Local branch exists |
 | `mobile-app` | `7c8705f` | Generated Flutter application for Android and iOS | Local commit exists |
@@ -34,7 +36,7 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
 - The GitHub `main` ref is readable at commit `98e3939`.
 - Local `main` and `dev` point to `3ffef7d`. The local and GitHub root commits
   have the same initial tree but no shared commit ancestor.
-- The GitHub `dev` and `mobile-app` refs were not available when checked on
+- The GitHub `dev` and `mobile-app` refs were published and verified on
   24 September 2026.
 - No backend branch, tag, or commit has been verified.
 - The planned tag `backend-baseline-v0.1.0` must not be created until a
@@ -46,7 +48,7 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
 
 - [ ] Locate the backend source referenced by the Notion tracker.
 - [ ] Verify that the backend source builds and identify its commit history.
-- [ ] Publish `dev` and `mobile-app` to GitHub.
+- [x] Publish `dev` and `mobile-app` to GitHub.
 - [ ] Require pull requests for changes to `main`.
 - [ ] Confirm `git ls-remote` returns both `main` and `dev`.
 - [ ] Verify Docker Compose configuration when backend source is available.
