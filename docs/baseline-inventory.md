@@ -38,6 +38,10 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
   have the same initial tree but no shared commit ancestor.
 - The GitHub `dev` and `mobile-app` refs were published and verified on
   24 September 2026.
+- A clean clone can check out `dev`, `mobile-app`, and
+  `chore/LC-S0-01-baseline-inventory`.
+- GitHub `main` requires a pull request, one approval, resolved conversations,
+  and disallows force-pushes and deletion.
 - No backend branch, tag, or commit has been verified.
 - The planned tag `backend-baseline-v0.1.0` must not be created until a
   buildable backend commit is located.
@@ -49,8 +53,8 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
 - [ ] Locate the backend source referenced by the Notion tracker.
 - [ ] Verify that the backend source builds and identify its commit history.
 - [x] Publish `dev` and `mobile-app` to GitHub.
-- [ ] Require pull requests for changes to `main`.
-- [ ] Confirm `git ls-remote` returns both `main` and `dev`.
+- [x] Require pull requests for changes to `main`.
+- [x] Confirm `git ls-remote` returns both `main` and `dev`.
 - [ ] Verify Docker Compose configuration when backend source is available.
 - [ ] Create `backend-baseline-v0.1.0` on a buildable backend commit.
 - [ ] Record commit SHA, scope, and test evidence for each service.
