@@ -8,7 +8,7 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
 | --- | --- | --- | --- |
 | `origin/main` | `98e3939` | Root README only | GitHub default branch |
 | `origin/dev` | `98e3939` | Integration baseline from GitHub `main` | Published |
-| `origin/mobile-app` | `67a2760` | Generated Flutter application for Android and iOS | Published and tested |
+| `origin/mobile-app` | `99c9fe9` | Generated Flutter application plus repository/iOS ignore rules | Published and tested |
 | `main` | `3ffef7d` | Root README only | Local branch exists |
 | `dev` | `3ffef7d` | Same baseline as `main` | Local branch exists |
 | `mobile-app` | `7c8705f` | Generated Flutter application for Android and iOS | Local commit exists |
@@ -40,6 +40,10 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
   24 September 2026.
 - A clean clone can check out `dev`, `mobile-app`, and
   `chore/LC-S0-01-baseline-inventory`.
+- A fresh clone of `origin/mobile-app` at `99c9fe9` passed `flutter pub get`,
+  `flutter analyze`, and `flutter test` on Flutter 3.47.5 (Dart 3.13.4) on
+  24 September 2026. Analyze reported no issues and the widget smoke test
+  passed 1/1.
 - GitHub `main` requires a pull request, one approval, resolved conversations,
   and disallows force-pushes and deletion.
 - No backend branch, tag, or commit has been verified.
@@ -55,6 +59,8 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
 - [x] Publish `dev` and `mobile-app` to GitHub.
 - [x] Require pull requests for changes to `main`.
 - [x] Confirm `git ls-remote` returns both `main` and `dev`.
+- [x] Re-run Flutter dependency resolution, static analysis, and tests from a
+  clean GitHub clone at `origin/mobile-app` commit `99c9fe9`.
 - [ ] Verify Docker Compose configuration when backend source is available.
 - [ ] Create `backend-baseline-v0.1.0` on a buildable backend commit.
 - [ ] Record commit SHA, scope, and test evidence for each service.
