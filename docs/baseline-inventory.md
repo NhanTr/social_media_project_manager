@@ -52,6 +52,25 @@ Updated 24 September 2026 for Trello card `LC-S0-01`.
 - Do not force-push `main`. Build publishable branches from `origin/main` and
   apply the verified local task commits on top.
 
+## Backend recovery investigation
+
+- The Notion [backend implementation tracker](https://app.notion.com/p/3a67b662e4cd8109a9f4d5dde79c827a)
+  reports a completed Maven multi-module backend, Flyway migrations, Docker
+  Compose health checks, and passing tests, but provides no repository URL or
+  commit SHA. Those completion claims remain unverified.
+- The Notion [architecture and sprint plan](https://app.notion.com/p/e1c15a30f6534d32b2bb13bb99af0514)
+  names the expected local project `social-media-ai-backend` and its Gateway
+  and service modules.
+- A matching original local repository was located under
+  `Documents/App/LocCoc/social-media-ai-backend`, but the current automation
+  session cannot read it because macOS privacy controls deny access.
+- An accessible recovery worktree contains only an earlier 110-file scaffold:
+  no root Maven aggregator, service application shells only, and a Compose
+  file containing PostgreSQL and Redis rather than the complete stack. It must
+  not be published as the completed backend baseline.
+- Backend verification is therefore blocked until the original repository can
+  be read or an equivalent archive/remote with Git metadata is supplied.
+
 ## Required evidence before completing LC-S0-01
 
 - [ ] Locate the backend source referenced by the Notion tracker.
