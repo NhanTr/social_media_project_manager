@@ -1,0 +1,20 @@
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# Local environment and secret files
+.env
+.env.*
+!.env.example
+
+# Editor and IDE user settings
+.idea/
+*.iml
+*.swp
+*.xcuserstate
+**/xcuserdata/
+
+# Logs and temporary files
+*.log
+*.tmp
+

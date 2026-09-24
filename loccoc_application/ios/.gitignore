@@ -9,6 +9,7 @@
 .tags*
 **/.vagrant/
 **/DerivedData/
+/Build/
 Icon?
 **/Pods/
 **/.symlinks/
