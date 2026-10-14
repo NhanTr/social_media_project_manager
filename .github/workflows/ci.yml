@@ -1,0 +1,68 @@
+name: LocCoc Continuous Integration
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  flutter-quality-gate:
+    name: Flutter Lint & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          cd loccoc_application
+          flutter pub get
+
+      - name: Run Flutter analyzer
+        run: |
+          cd loccoc_application
+          flutter analyze --no-fatal-infos
+
+      - name: Run Flutter unit & widget tests
+        run: |
+          cd loccoc_application
+          flutter test --coverage
+
+  backend-quality-gate:
+    name: Backend Build & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run Maven build and tests
+        run: |
+          cd backend
+          mvn -B clean test
+
+  security-and-conventions:
+    name: Security Scan & Conventions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for committed secrets
+        run: |
+          echo "Scanning for accidental hardcoded secrets..."
+          ! grep -rnE --exclude-dir={.git,target,.dart_tool} "BEGIN (RSA|EC|DSA|OPENSSH) PRIVATE KEY" .
