@@ -1,0 +1,54 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: identity
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/terms/**,/api/v1/account/**
+            - id: social
+              uri: ${SOCIAL_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/v1/friends/**,/api/v1/friend-requests/**,/api/v1/blocks/**
+            - id: post
+              uri: ${POST_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/v1/media/**,/api/v1/posts/**,/api/v1/feed/**,/api/v1/widget/**
+            - id: notification
+              uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/v1/device-tokens/**,/api/v1/notifications/**
+            - id: chat
+              uri: ${CHAT_SERVICE_URL:http://localhost:8085}
+              predicates:
+                - Path=/api/v1/conversations/**,/api/v1/messages/**,/ws/chat/**
+            - id: ai
+              uri: ${AI_SERVICE_URL:http://localhost:8086}
+              predicates:
+                - Path=/api/v1/ai/**
+            - id: moderation
+              uri: ${MODERATION_SERVICE_URL:http://localhost:8087}
+              predicates:
+                - Path=/api/v1/reports/**,/api/v1/admin/**
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-this-local-development-secret-key-at-least-32-bytes}
+  internal-api-key: ${INTERNAL_API_KEY:loccoc-local-internal-key}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{requestId:-}]"
