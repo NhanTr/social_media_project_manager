@@ -1,2 +1,35 @@
+# macOS metadata
 .DS_Store
-/loccoc_application/
+**/.DS_Store
+
+# Local environment and secret files
+.env
+.env.*
+!.env.example
+
+# Editor and IDE user settings
+.idea/
+*.iml
+*.swp
+*.xcuserstate
+**/xcuserdata/
+.vscode/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Flutter / Dart build artifacts
+**/loccoc_application/build/
+**/loccoc_application/.dart_tool/
+**/loccoc_application/.flutter-plugins
+**/loccoc_application/.flutter-plugins-dependencies
+**/loccoc_application/.packages
+
+# Maven / Java build artifacts
+**/target/
+**/*.class
+
+# Docker local data
+postgres_data/
+minio_data/
