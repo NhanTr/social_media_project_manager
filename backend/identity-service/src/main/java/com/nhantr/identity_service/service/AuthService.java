@@ -1,6 +1,10 @@
 package com.nhantr.identity_service.service;
 
 import com.nhantr.identity_service.dto.request.*;
+import com.nhantr.common.api.ApiException;
+import org.springframework.http.HttpStatus;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import java.util.List;
 import com.nhantr.identity_service.dto.response.*;
 import com.nhantr.identity_service.entity.User;
 import com.nhantr.identity_service.enums.AuthProvider;
@@ -23,6 +27,16 @@ import java.util.UUID;
 
 @Service
 public class AuthService {
+
+    private static final DefaultRedisScript<Long> VERIFY_OTP = new DefaultRedisScript<>("""
+            local attempts = redis.call('INCR', KEYS[2])
+            if attempts == 1 then redis.call('EXPIRE', KEYS[2], ARGV[2]) end
+            if attempts > 5 then return -1 end
+            if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+            redis.call('DEL', KEYS[1])
+            redis.call('DEL', KEYS[2])
+            return 1
+            """, Long.class);
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -54,6 +68,10 @@ public class AuthService {
 
     public OtpResponse requestPhoneOtp(PhoneOtpRequest request) {
         String phoneNumber = normalizePhoneNumber(request.phoneNumber());
+        if (!Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(
+                otpKey(phoneNumber) + ":cooldown", "1", Duration.ofSeconds(60)))) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_RATE_LIMITED", "Please wait 60 seconds before requesting another OTP.");
+        }
         String otp = String.format(Locale.ROOT, "%06d", SECURE_RANDOM.nextInt(1_000_000));
 
         redisTemplate.opsForValue().set(otpKey(phoneNumber), otp, Duration.ofMinutes(otpExpirationMinutes));
@@ -69,13 +87,15 @@ public class AuthService {
     public AuthResponse verifyPhoneOtp(VerifyPhoneOtpRequest request) {
         String phoneNumber = normalizePhoneNumber(request.phoneNumber());
         String submittedOtp = requireText(request.otp(), "otp");
-        String savedOtp = redisTemplate.opsForValue().get(otpKey(phoneNumber));
-
-        if (!submittedOtp.equals(savedOtp)) {
-            throw new IllegalArgumentException("OTP is invalid or expired.");
+        Long result = redisTemplate.execute(VERIFY_OTP,
+                List.of(otpKey(phoneNumber), otpKey(phoneNumber) + ":attempts"),
+                submittedOtp, Long.toString(otpExpirationMinutes * 60));
+        if (Long.valueOf(-1).equals(result)) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_ATTEMPTS_EXCEEDED", "Too many OTP attempts. Try again later.");
         }
-
-        redisTemplate.delete(otpKey(phoneNumber));
+        if (!Long.valueOf(1).equals(result)) {
+            throw ApiException.badRequest("OTP_INVALID", "OTP is invalid or expired.");
+        }
 
         User user = userRepository.findByPhoneNumber(phoneNumber)
                 .orElseGet(() -> createPhoneUser(phoneNumber, request.displayName()));
@@ -96,13 +116,12 @@ public class AuthService {
         Long userId = jwtService.getUserId(claims);
         String tokenId = jwtService.getTokenId(claims);
         String refreshKey = refreshTokenKey(userId, tokenId);
-        String savedToken = redisTemplate.opsForValue().get(refreshKey);
+        String savedToken = redisTemplate.opsForValue().getAndDelete(refreshKey);
 
         if (!refreshToken.equals(savedToken)) {
             throw new IllegalArgumentException("Refresh token is expired or revoked.");
         }
 
-        redisTemplate.delete(refreshKey);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found."));
