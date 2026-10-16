@@ -231,3 +231,8 @@ sequenceDiagram
 5. Xoá refresh-token sessions trong Redis.
 
 Worker hard-delete, API huỷ yêu cầu trong thời gian ân hạn và trạng thái purge thực tế chưa có.
+
+
+## Bổ sung 16/10/2026: hủy lời mời
+
+Sender gọi POST `/api/v1/friend-requests/{id}/cancel`. Social khóa hàng request, kiểm tra sender, chuyển PENDING → CANCELLED; request biến khỏi incoming/outgoing. Gọi lại CANCELLED trả cùng trạng thái. Receiver không được hủy; request đã accept/decline trả conflict. Không tạo friendship hoặc notification khi hủy.

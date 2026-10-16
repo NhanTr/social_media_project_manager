@@ -108,6 +108,21 @@ public class SocialService {
     }
 
     @Transactional
+    public RequestResponse cancel(Long senderId, Long requestId) {
+        FriendRequest request = requestRepository.findForUpdate(requestId)
+                .orElseThrow(() -> ApiException.notFound("FRIEND_REQUEST_NOT_FOUND", "Friend request not found."));
+        if (!senderId.equals(request.getSenderId())) {
+            throw ApiException.forbidden("FRIEND_REQUEST_FORBIDDEN", "Only the sender can cancel this request.");
+        }
+        if (request.getStatus() == FriendRequest.Status.CANCELLED) return RequestResponse.from(request);
+        if (request.getStatus() != FriendRequest.Status.PENDING) {
+            throw ApiException.conflict("FRIEND_REQUEST_CLOSED", "Friend request is no longer pending.");
+        }
+        request.setStatus(FriendRequest.Status.CANCELLED);
+        return RequestResponse.from(requestRepository.save(request));
+    }
+
+    @Transactional
     public BlockResponse block(Long blockerId, Long blockedId) {
         validatePair(blockerId, blockedId);
         if (!identityClient.exists(blockedId)) {
@@ -149,7 +164,7 @@ public class SocialService {
     }
 
     private FriendRequest pendingOwnedRequest(Long receiverId, Long requestId) {
-        FriendRequest request = requestRepository.findById(requestId)
+        FriendRequest request = requestRepository.findForUpdate(requestId)
                 .orElseThrow(() -> ApiException.notFound("FRIEND_REQUEST_NOT_FOUND", "Friend request not found."));
         if (!receiverId.equals(request.getReceiverId())) {
             throw ApiException.forbidden("FRIEND_REQUEST_FORBIDDEN", "Only the receiver can handle this request.");

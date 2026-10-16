@@ -98,6 +98,7 @@ Ràng buộc đáng chú ý:
 | GET | `/api/v1/friend-requests/outgoing` | User | — | Request đã gửi |
 | POST | `/api/v1/friend-requests/{id}/accept` | User | — | Friendship |
 | POST | `/api/v1/friend-requests/{id}/decline` | User | — | Request trạng thái `DECLINED` |
+| POST | `/api/v1/friend-requests/{id}/cancel` | Sender | — | `CANCELLED`; retry cùng sender idempotent; 403 nếu không phải sender, 409 nếu đã accept/decline |
 | POST | `/api/v1/blocks/{userId}` | User | — | `201`, block |
 | DELETE | `/api/v1/blocks/{userId}` | User | — | `204` |
 | GET | `/api/v1/blocks` | User | — | Danh sách block |
@@ -292,3 +293,12 @@ Notification event:
 ```
 
 Caller nên gửi `Idempotency-Key` ổn định theo domain event để tránh tạo notification trùng khi retry.
+
+
+### Bổ sung Sprint 1 — 16/10/2026
+
+- OTP mock trả `devOtp` khi expose-code bật; verify nhận `otp`, không phải `otpCode`.
+- Gửi lại OTP: cooldown 60 giây, HTTP 429 `OTP_RATE_LIMITED`. Tối đa 5 lần thử trong cửa sổ TTL OTP; vượt ngưỡng trả `OTP_ATTEMPTS_EXCEEDED`. Redis Lua xác minh và tiêu thụ OTP atomically.
+- Refresh dùng Redis GETDEL để chỉ một request đồng thời tiêu thụ được refresh token cũ. Logout thu hồi refresh token; access token hiện còn hiệu lực đến expiry.
+- Search relationship trả `friend`, `blocked`, `pendingRequestId`.
+- Hủy lời mời yêu cầu migration V3, chỉ sender được hủy PENDING; retry CANCELLED trả cùng kết quả. Accept/decline/cancel khóa hàng request trong transaction.

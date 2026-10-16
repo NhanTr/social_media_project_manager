@@ -3,12 +3,18 @@ package com.nhantr.social_service.repository;
 import com.nhantr.social_service.entity.FriendRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface FriendRequestRepository extends JpaRepository<FriendRequest, Long> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from FriendRequest r where r.id = :id")
+    Optional<FriendRequest> findForUpdate(@Param("id") Long id);
+
     List<FriendRequest> findByReceiverIdAndStatusOrderByCreatedAtDesc(Long receiverId, FriendRequest.Status status);
     List<FriendRequest> findBySenderIdAndStatusOrderByCreatedAtDesc(Long senderId, FriendRequest.Status status);
 

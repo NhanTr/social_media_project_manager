@@ -10,7 +10,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "friend_requests")
 public class FriendRequest {
-    public enum Status { PENDING, ACCEPTED, DECLINED }
+    public enum Status { PENDING, ACCEPTED, DECLINED, CANCELLED }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
