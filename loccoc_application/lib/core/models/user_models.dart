@@ -27,7 +27,10 @@ class UserModel {
       username: json['username'] as String? ?? 'user_${json['id']}',
       email: json['email'] as String?,
       phoneNumber: json['phoneNumber'] as String?,
-      displayName: json['displayName'] as String? ?? json['username'] as String? ?? 'User',
+      displayName:
+          json['displayName'] as String? ??
+          json['username'] as String? ??
+          'User',
       avatarUrl: json['avatarUrl'] as String?,
       bio: json['bio'] as String?,
       status: json['status'] as String? ?? 'ACTIVE',
@@ -71,8 +74,11 @@ class AuthSession {
       refreshToken: json['refreshToken'] as String? ?? '',
       tokenType: json['tokenType'] as String? ?? 'Bearer',
       expiresInSeconds: json['expiresInSeconds'] as int? ?? 3600,
-      user: json['user'] != null ? UserModel.fromJson(json['user'] as Map<String, dynamic>) : null,
-      requiresTermsAcceptance: json['requiresTermsAcceptance'] as bool? ?? false,
+      user: json['user'] != null
+          ? UserModel.fromJson(json['user'] as Map<String, dynamic>)
+          : null,
+      requiresTermsAcceptance:
+          json['requiresTermsAcceptance'] as bool? ?? false,
     );
   }
 }
@@ -119,7 +125,8 @@ class FriendSummary {
     return FriendSummary(
       id: json['id'] as int? ?? 0,
       username: json['username'] as String? ?? '',
-      displayName: json['displayName'] as String? ?? json['username'] as String? ?? '',
+      displayName:
+          json['displayName'] as String? ?? json['username'] as String? ?? '',
       avatarUrl: json['avatarUrl'] as String?,
       bio: json['bio'] as String?,
     );
@@ -191,8 +198,8 @@ class SearchResultModel {
   factory SearchResultModel.fromJson(Map<String, dynamic> json) {
     return SearchResultModel(
       user: FriendSummary.fromJson(json['user'] as Map<String, dynamic>? ?? {}),
-      areFriends: json['areFriends'] as bool? ?? false,
-      isBlocked: json['isBlocked'] as bool? ?? false,
+      areFriends: json['friend'] as bool? ?? false,
+      isBlocked: json['blocked'] as bool? ?? false,
       pendingRequestId: json['pendingRequestId'] as int?,
     );
   }

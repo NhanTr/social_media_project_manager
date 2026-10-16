@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../../core/models/user_models.dart';
 import '../../core/network/api_client.dart';
 
@@ -11,6 +12,28 @@ class FriendsController extends ChangeNotifier {
   List<BlockModel> _blockedUsers = [];
   List<SearchResultModel> _searchResults = [];
 
+  final Set<String> _pendingActions = {};
+  bool isPending(String key) => _pendingActions.contains(key);
+  int _searchVersion = 0;
+
+  Future<bool> _mutate(String key, Future<bool> Function() action) async {
+    if (!_pendingActions.add(key)) return false;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final result = await action();
+      if (result && _lastQuery.isNotEmpty) await searchUsers(_lastQuery);
+      return result;
+    } catch (_) {
+      _errorMessage = 'Không thể hoàn tất thao tác. Vui lòng thử lại.';
+      return false;
+    } finally {
+      _pendingActions.remove(key);
+      notifyListeners();
+    }
+  }
+
+  String _lastQuery = '';
   bool _isLoading = false;
   bool _isSearching = false;
   String? _errorMessage;
@@ -48,6 +71,11 @@ class FriendsController extends ChangeNotifier {
 
   Future<void> loadFriends() async {
     final res = await api.get('/api/v1/friends');
+    if (!res.success) {
+      _errorMessage =
+          res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
+      notifyListeners();
+    }
     if (res.success && res.data is List) {
       _friends = (res.data as List)
           .map((item) => FriendSummary.fromJson(item as Map<String, dynamic>))
@@ -58,9 +86,16 @@ class FriendsController extends ChangeNotifier {
 
   Future<void> loadIncomingRequests() async {
     final res = await api.get('/api/v1/friend-requests/incoming');
+    if (!res.success) {
+      _errorMessage =
+          res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
+      notifyListeners();
+    }
     if (res.success && res.data is List) {
       _incomingRequests = (res.data as List)
-          .map((item) => FriendRequestModel.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) => FriendRequestModel.fromJson(item as Map<String, dynamic>),
+          )
           .toList();
       notifyListeners();
     }
@@ -68,9 +103,16 @@ class FriendsController extends ChangeNotifier {
 
   Future<void> loadOutgoingRequests() async {
     final res = await api.get('/api/v1/friend-requests/outgoing');
+    if (!res.success) {
+      _errorMessage =
+          res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
+      notifyListeners();
+    }
     if (res.success && res.data is List) {
       _outgoingRequests = (res.data as List)
-          .map((item) => FriendRequestModel.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) => FriendRequestModel.fromJson(item as Map<String, dynamic>),
+          )
           .toList();
       notifyListeners();
     }
@@ -78,6 +120,11 @@ class FriendsController extends ChangeNotifier {
 
   Future<void> loadBlockedUsers() async {
     final res = await api.get('/api/v1/blocks');
+    if (!res.success) {
+      _errorMessage =
+          res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
+      notifyListeners();
+    }
     if (res.success && res.data is List) {
       _blockedUsers = (res.data as List)
           .map((item) => BlockModel.fromJson(item as Map<String, dynamic>))
@@ -87,6 +134,8 @@ class FriendsController extends ChangeNotifier {
   }
 
   Future<void> searchUsers(String query) async {
+    final version = ++_searchVersion;
+    _lastQuery = query.trim();
     if (query.trim().isEmpty) {
       _searchResults = [];
       _isSearching = false;
@@ -98,10 +147,22 @@ class FriendsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await api.get('/api/v1/friends/search', queryParams: {'keyword': query.trim()});
+      final res = await api.get(
+        '/api/v1/friends/search',
+        queryParams: {'keyword': query.trim()},
+      );
+      if (version != _searchVersion) return;
+      if (!res.success) {
+        _errorMessage =
+            res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
+        notifyListeners();
+      }
       if (res.success && res.data is List) {
         _searchResults = (res.data as List)
-            .map((item) => SearchResultModel.fromJson(item as Map<String, dynamic>))
+            .map(
+              (item) =>
+                  SearchResultModel.fromJson(item as Map<String, dynamic>),
+            )
             .toList();
       } else {
         _searchResults = [];
@@ -109,19 +170,29 @@ class FriendsController extends ChangeNotifier {
     } catch (_) {
       _searchResults = [];
     } finally {
-      _isSearching = false;
-      notifyListeners();
+      if (version == _searchVersion) {
+        _isSearching = false;
+        notifyListeners();
+      }
     }
   }
 
   void clearSearch() {
+    _searchVersion++;
+    _lastQuery = "";
     _searchResults = [];
     _isSearching = false;
     notifyListeners();
   }
 
-  Future<bool> sendFriendRequest(int receiverId) async {
-    final res = await api.post('/api/v1/friend-requests', body: {'receiverId': receiverId});
+  Future<bool> sendFriendRequest(int receiverId) =>
+      _mutate('user:$receiverId', () => _sendFriendRequest(receiverId));
+
+  Future<bool> _sendFriendRequest(int receiverId) async {
+    final res = await api.post(
+      '/api/v1/friend-requests',
+      body: {'receiverId': receiverId},
+    );
     if (res.success) {
       await loadOutgoingRequests();
       return true;
@@ -132,9 +203,14 @@ class FriendsController extends ChangeNotifier {
     }
   }
 
-  Future<bool> acceptFriendRequest(int requestId) async {
+  Future<bool> acceptFriendRequest(int requestId) =>
+      _mutate('request:$requestId', () => _acceptFriendRequest(requestId));
+
+  Future<bool> _acceptFriendRequest(int requestId) async {
     // Optimistic update
-    final pending = _incomingRequests.firstWhere((r) => r.id == requestId, orElse: () => FriendRequestModel(id: requestId, senderId: 0, receiverId: 0, status: ''));
+    final index = _incomingRequests.indexWhere((r) => r.id == requestId);
+    if (index < 0) return false;
+    final pending = _incomingRequests[index];
     _incomingRequests.removeWhere((r) => r.id == requestId);
     notifyListeners();
 
@@ -143,14 +219,22 @@ class FriendsController extends ChangeNotifier {
       await loadFriends();
       return true;
     } else {
-      _incomingRequests.add(pending);
+      if (!_incomingRequests.any((r) => r.id == requestId)) {
+        _incomingRequests.insert(
+          index.clamp(0, _incomingRequests.length),
+          pending,
+        );
+      }
       _errorMessage = res.errorMessage ?? 'Không thể chấp nhận lời mời.';
       notifyListeners();
       return false;
     }
   }
 
-  Future<bool> declineFriendRequest(int requestId) async {
+  Future<bool> declineFriendRequest(int requestId) =>
+      _mutate('request:$requestId', () => _declineFriendRequest(requestId));
+
+  Future<bool> _declineFriendRequest(int requestId) async {
     final res = await api.post('/api/v1/friend-requests/$requestId/decline');
     if (res.success) {
       _incomingRequests.removeWhere((r) => r.id == requestId);
@@ -163,7 +247,22 @@ class FriendsController extends ChangeNotifier {
     }
   }
 
-  Future<bool> blockUser(int userId) async {
+  Future<bool> cancelFriendRequest(int requestId) =>
+      _mutate('request:$requestId', () async {
+        final res = await api.post('/api/v1/friend-requests/$requestId/cancel');
+        if (!res.success) {
+          _errorMessage = res.errorMessage ?? 'Không thể hủy lời mời.';
+          return false;
+        }
+        _outgoingRequests.removeWhere((r) => r.id == requestId);
+        notifyListeners();
+        return true;
+      });
+
+  Future<bool> blockUser(int userId) =>
+      _mutate('user:$userId', () => _blockUser(userId));
+
+  Future<bool> _blockUser(int userId) async {
     final res = await api.post('/api/v1/blocks/$userId');
     if (res.success) {
       _friends.removeWhere((f) => f.id == userId);
@@ -179,7 +278,10 @@ class FriendsController extends ChangeNotifier {
     }
   }
 
-  Future<bool> unblockUser(int userId) async {
+  Future<bool> unblockUser(int userId) =>
+      _mutate('user:$userId', () => _unblockUser(userId));
+
+  Future<bool> _unblockUser(int userId) async {
     final res = await api.delete('/api/v1/blocks/$userId');
     if (res.success) {
       _blockedUsers.removeWhere((b) => b.blockedId == userId);

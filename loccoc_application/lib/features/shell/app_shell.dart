@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../auth/auth_controller.dart';
 import '../friends/friends_controller.dart';
 import '../friends/screens/friends_screen.dart';
@@ -20,7 +21,9 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    _friendsController = FriendsController(api: widget.authController.apiClient);
+    _friendsController = FriendsController(
+      api: widget.authController.apiClient,
+    );
   }
 
   @override
@@ -33,10 +36,7 @@ class _AppShellState extends State<AppShell> {
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
@@ -73,7 +73,10 @@ class _AppShellState extends State<AppShell> {
   Widget _buildFeedTab() {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bảng tin LocCoc', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Bảng tin LocCoc',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: const Color(0xFF17365D),
         foregroundColor: Colors.white,
       ),
@@ -89,12 +92,20 @@ class _AppShellState extends State<AppShell> {
                   color: const Color(0xFFF3F7FB),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.photo_library_outlined, size: 64, color: Color(0xFF17365D)),
+                child: const Icon(
+                  Icons.photo_library_outlined,
+                  size: 64,
+                  color: Color(0xFF17365D),
+                ),
               ),
               const SizedBox(height: 16),
               const Text(
                 'Bảng tin Bạn bè (Friends-Only Feed)',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF17365D)),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF17365D),
+                ),
               ),
               const SizedBox(height: 8),
               const Text(
@@ -112,7 +123,10 @@ class _AppShellState extends State<AppShell> {
   Widget _buildChatTab() {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tin nhắn', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Tin nhắn',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: const Color(0xFF17365D),
         foregroundColor: Colors.white,
       ),
@@ -128,12 +142,20 @@ class _AppShellState extends State<AppShell> {
                   color: const Color(0xFFF3F7FB),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.mark_chat_unread_outlined, size: 64, color: Color(0xFF17365D)),
+                child: const Icon(
+                  Icons.mark_chat_unread_outlined,
+                  size: 64,
+                  color: Color(0xFF17365D),
+                ),
               ),
               const SizedBox(height: 16),
               const Text(
                 'Nhắn tin Realtime 1-1',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF17365D)),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF17365D),
+                ),
               ),
               const SizedBox(height: 8),
               const Text(

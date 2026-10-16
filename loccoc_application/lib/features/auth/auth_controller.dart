@@ -1,16 +1,17 @@
+import 'package:google_sign_in/google_sign_in.dart';
+
+import '../../core/config/app_config.dart';
+
 import 'package:flutter/foundation.dart';
+
 import '../../core/models/user_models.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/session_storage.dart';
 
-enum AuthStatus {
-  uninitialized,
-  authenticated,
-  requiresTerms,
-  unauthenticated,
-}
+enum AuthStatus { uninitialized, authenticated, requiresTerms, unauthenticated }
 
 class AuthController extends ChangeNotifier {
+  static Future<void>? _googleInitialization;
   final ApiClient _api;
   final SessionStorage _storage;
 
@@ -21,11 +22,9 @@ class AuthController extends ChangeNotifier {
   String? _lastOtpMock;
   bool _isGatewayHealthy = false;
 
-  AuthController({
-    ApiClient? api,
-    SessionStorage? storage,
-  })  : _storage = storage ?? SessionStorage(),
-        _api = api ?? ApiClient(storage: storage) {
+  AuthController({ApiClient? api, SessionStorage? storage})
+    : _storage = storage ?? SessionStorage(),
+      _api = api ?? ApiClient(storage: storage) {
     _api.onSessionExpired = () {
       _status = AuthStatus.unauthenticated;
       _currentUser = null;
@@ -63,8 +62,12 @@ class AuthController extends ChangeNotifier {
             final uid = await _storage.getUserId();
             final uname = await _storage.getUsername();
             final dname = await _storage.getDisplayName();
-            if (uid != null && uname != null) {
-              _currentUser = UserModel(id: uid, username: uname, displayName: dname ?? uname);
+            if (res.statusCode == 0 && uid != null && uname != null) {
+              _currentUser = UserModel(
+                id: uid,
+                username: uname,
+                displayName: dname ?? uname,
+              );
               _status = AuthStatus.authenticated;
             } else {
               _status = AuthStatus.unauthenticated;
@@ -88,13 +91,14 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _api.post('/api/v1/auth/phone/send-otp', body: {
-        'phoneNumber': phoneNumber.trim(),
-      });
+      final res = await _api.post(
+        '/api/v1/auth/phone/send-otp',
+        body: {'phoneNumber': phoneNumber.trim()},
+      );
 
       if (res.success && res.data is Map<String, dynamic>) {
         final data = res.data as Map<String, dynamic>;
-        _lastOtpMock = data['otpCode']?.toString();
+        _lastOtpMock = data['devOtp']?.toString();
         _isLoading = false;
         notifyListeners();
         return true;
@@ -118,10 +122,10 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _api.post('/api/v1/auth/phone/verify-otp', body: {
-        'phoneNumber': phoneNumber.trim(),
-        'otpCode': otpCode.trim(),
-      });
+      final res = await _api.post(
+        '/api/v1/auth/phone/verify-otp',
+        body: {'phoneNumber': phoneNumber.trim(), 'otp': otpCode.trim()},
+      );
 
       if (res.success && res.data is Map<String, dynamic>) {
         final session = AuthSession.fromJson(res.data as Map<String, dynamic>);
@@ -141,23 +145,45 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  Future<bool> loginWithGoogle([String? mockToken]) async {
+  Future<bool> loginWithGoogle([String? idToken]) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final token = mockToken ?? 'mock-google-id-token-${DateTime.now().millisecondsSinceEpoch}';
-      final res = await _api.post('/api/v1/auth/google', body: {
-        'idToken': token,
-      });
+      String? token = idToken;
+      if (token == null) {
+        if (AppConfig.googleServerClientId.isEmpty) {
+          _errorMessage =
+              'Đăng nhập Google chưa được cấu hình. Vui lòng dùng OTP.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+        await (_googleInitialization ??= GoogleSignIn.instance.initialize(
+          serverClientId: AppConfig.googleServerClientId,
+          clientId: AppConfig.googleIosClientId.isEmpty
+              ? null
+              : AppConfig.googleIosClientId,
+        ));
+        final account = await GoogleSignIn.instance.authenticate();
+        token = account.authentication.idToken;
+        if (token == null || token.isEmpty) {
+          throw StateError('Google không cung cấp ID token.');
+        }
+      }
+      final res = await _api.post(
+        '/api/v1/auth/google',
+        body: {'idToken': token},
+      );
 
       if (res.success && res.data is Map<String, dynamic>) {
         final session = AuthSession.fromJson(res.data as Map<String, dynamic>);
         await _saveAuthSession(session);
         return true;
       } else {
-        _errorMessage = res.errorMessage ?? 'Đăng nhập Google không thành công.';
+        _errorMessage =
+            res.errorMessage ?? 'Đăng nhập Google không thành công.';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -177,7 +203,7 @@ class AuthController extends ChangeNotifier {
         return TermsModel.fromJson(res.data as Map<String, dynamic>);
       }
     } catch (_) {}
-    return const TermsModel(id: 1, version: 'v1.0.0', contentUrl: '');
+    return null;
   }
 
   Future<bool> acceptTerms(int termsVersionId) async {
@@ -186,14 +212,17 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _api.post('/api/v1/terms/accept', body: {
-        'termsVersionId': termsVersionId,
-      });
+      final res = await _api.post(
+        '/api/v1/terms/accept',
+        body: {'termsVersionId': termsVersionId},
+      );
 
       if (res.success) {
         await _storage.setTermsAccepted();
         _status = AuthStatus.authenticated;
         await refreshProfile();
+        _isLoading = false;
+        notifyListeners();
         return true;
       } else {
         _errorMessage = res.errorMessage ?? 'Đồng ý điều khoản thất bại.';
@@ -219,7 +248,11 @@ class AuthController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<bool> updateProfile({String? displayName, String? bio, String? avatarUrl}) async {
+  Future<bool> updateProfile({
+    String? displayName,
+    String? bio,
+    String? avatarUrl,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     try {

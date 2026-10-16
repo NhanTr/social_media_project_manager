@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
 import '../config/app_config.dart';
 import '../storage/session_storage.dart';
 
@@ -30,8 +32,8 @@ class ApiClient {
     http.Client? client,
     SessionStorage? storage,
     this.onSessionExpired,
-  })  : _client = client ?? http.Client(),
-        _storage = storage ?? SessionStorage();
+  }) : _client = client ?? http.Client(),
+       _storage = storage ?? SessionStorage();
 
   Uri _uri(String path, [Map<String, String>? queryParams]) {
     final base = AppConfig.baseUrl.endsWith('/')
@@ -68,34 +70,60 @@ class ApiClient {
     }
   }
 
-  Future<ApiResponse<dynamic>> get(String path, {Map<String, String>? queryParams}) async {
-    return _sendRequest((token) => _client.get(_uri(path, queryParams), headers: _buildHeaders(token: token)));
+  Future<ApiResponse<dynamic>> get(
+    String path, {
+    Map<String, String>? queryParams,
+  }) async {
+    return _sendRequest(
+      (token) => _client.get(
+        _uri(path, queryParams),
+        headers: _buildHeaders(token: token),
+      ),
+    );
   }
 
   Future<ApiResponse<dynamic>> post(String path, {dynamic body}) async {
     final payload = body != null ? jsonEncode(body) : null;
-    return _sendRequest((token) => _client.post(_uri(path), headers: _buildHeaders(token: token), body: payload));
+    return _sendRequest(
+      (token) => _client.post(
+        _uri(path),
+        headers: _buildHeaders(token: token),
+        body: payload,
+      ),
+    );
   }
 
   Future<ApiResponse<dynamic>> put(String path, {dynamic body}) async {
     final payload = body != null ? jsonEncode(body) : null;
-    return _sendRequest((token) => _client.put(_uri(path), headers: _buildHeaders(token: token), body: payload));
+    return _sendRequest(
+      (token) => _client.put(
+        _uri(path),
+        headers: _buildHeaders(token: token),
+        body: payload,
+      ),
+    );
   }
 
   Future<ApiResponse<dynamic>> delete(String path) async {
-    return _sendRequest((token) => _client.delete(_uri(path), headers: _buildHeaders(token: token)));
+    return _sendRequest(
+      (token) =>
+          _client.delete(_uri(path), headers: _buildHeaders(token: token)),
+    );
   }
 
-  Future<ApiResponse<dynamic>> _sendRequest(Future<http.Response> Function(String? token) execute) async {
+  Future<ApiResponse<dynamic>> _sendRequest(
+    Future<http.Response> Function(String? token) execute,
+  ) async {
     try {
       String? token = await _storage.getAccessToken();
-      var response = await execute(token);
+      var response = await execute(token).timeout(const Duration(seconds: 15));
 
       // Handle 401 with single-flight automatic token refresh
       if (response.statusCode == 401 && token != null) {
         final newToken = await _refreshTokenSingleFlight();
         if (newToken != null) {
-          response = await execute(newToken);
+          response = await execute(newToken)
+              .timeout(const Duration(seconds: 15));
         } else {
           await _storage.clear();
           onSessionExpired?.call();
@@ -108,6 +136,10 @@ class ApiClient {
         }
       }
 
+      if (response.statusCode == 401 && token != null) {
+        await _storage.clear();
+        onSessionExpired?.call();
+      }
       return _parseResponse(response);
     } catch (e) {
       return ApiResponse(
@@ -133,18 +165,23 @@ class ApiClient {
       }
 
       final uri = _uri('/api/v1/auth/refresh');
-      final res = await _client.post(
-        uri,
-        headers: _buildHeaders(),
-        body: jsonEncode({'refreshToken': refreshToken}),
-      );
+      final res = await _client
+          .post(
+            uri,
+            headers: _buildHeaders(),
+            body: jsonEncode({'refreshToken': refreshToken}),
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final newAccess = data['accessToken'] as String?;
         final newRefresh = data['refreshToken'] as String?;
         if (newAccess != null && newRefresh != null) {
-          await _storage.updateTokens(accessToken: newAccess, refreshToken: newRefresh);
+          await _storage.updateTokens(
+            accessToken: newAccess,
+            refreshToken: newRefresh,
+          );
           _refreshCompleter!.complete(newAccess);
           return newAccess;
         }
@@ -181,7 +218,10 @@ class ApiClient {
     String? errorMsg;
     String? errCode;
     if (parsedBody is Map<String, dynamic>) {
-      errorMsg = parsedBody['message'] as String? ?? parsedBody['error'] as String?;
+      errorMsg =
+          parsedBody['detail'] as String? ??
+          parsedBody['message'] as String? ??
+          parsedBody['error'] as String?;
       errCode = parsedBody['code'] as String?;
     }
 

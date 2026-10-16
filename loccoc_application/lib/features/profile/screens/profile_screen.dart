@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../auth/auth_controller.dart';
 import '../../../core/config/app_config.dart';
 
@@ -20,7 +21,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     final user = widget.authController.currentUser;
-    _displayNameController = TextEditingController(text: user?.displayName ?? '');
+    _displayNameController = TextEditingController(
+      text: user?.displayName ?? '',
+    );
     _bioController = TextEditingController(text: user?.bio ?? '');
   }
 
@@ -58,7 +61,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Hồ sơ cá nhân', style: TextStyle(fontWeight: FontWeight.bold)),
+            title: const Text(
+              'Hồ sơ cá nhân',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             backgroundColor: const Color(0xFF17365D),
             foregroundColor: Colors.white,
             actions: [
@@ -95,8 +101,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         backgroundColor: const Color(0xFF17365D),
                         foregroundColor: Colors.white,
                         child: Text(
-                          user?.displayName.isNotEmpty == true ? user!.displayName[0].toUpperCase() : 'U',
-                          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+                          user?.displayName.isNotEmpty == true
+                              ? user!.displayName[0].toUpperCase()
+                              : 'U',
+                          style: const TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       Positioned(
@@ -109,7 +120,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
                           ),
-                          child: const Icon(Icons.check, size: 12, color: Colors.white),
+                          child: const Icon(
+                            Icons.check,
+                            size: 12,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
@@ -118,7 +133,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 12),
                 Text(
                   user?.displayName ?? 'Người dùng LocCoc',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF17365D)),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF17365D),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -130,7 +149,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // Edit Profile Form or View Profile Info
                 Card(
                   elevation: 1,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -138,7 +159,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         const Text(
                           'Thông tin tài khoản',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF17365D)),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF17365D),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         if (_isEditing) ...[
@@ -160,16 +185,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 16),
                           FilledButton(
-                            onPressed: widget.authController.isLoading ? null : _handleSave,
-                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF17365D)),
+                            onPressed: widget.authController.isLoading
+                                ? null
+                                : _handleSave,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF17365D),
+                            ),
                             child: const Text('Lưu thay đổi'),
                           ),
                         ] else ...[
-                          _buildInfoRow('Tên hiển thị', user?.displayName ?? 'Chưa đặt'),
-                          _buildInfoRow('Số điện thoại', user?.phoneNumber ?? 'Chưa liên kết'),
-                          _buildInfoRow('Email', user?.email ?? 'Chưa liên kết'),
-                          _buildInfoRow('Mã mời bạn bè', user?.friendInviteCode ?? 'LOCCOC-${user?.id ?? 0}'),
-                          _buildInfoRow('Tiểu sử', user?.bio ?? 'Chưa có tiểu sử'),
+                          _buildInfoRow(
+                            'Tên hiển thị',
+                            user?.displayName ?? 'Chưa đặt',
+                          ),
+                          _buildInfoRow(
+                            'Số điện thoại',
+                            user?.phoneNumber ?? 'Chưa liên kết',
+                          ),
+                          _buildInfoRow(
+                            'Email',
+                            user?.email ?? 'Chưa liên kết',
+                          ),
+                          _buildInfoRow(
+                            'Mã mời bạn bè',
+                            user?.friendInviteCode ?? 'LOCCOC-${user?.id ?? 0}',
+                          ),
+                          _buildInfoRow(
+                            'Tiểu sử',
+                            user?.bio ?? 'Chưa có tiểu sử',
+                          ),
                           _buildInfoRow('Trạng thái', user?.status ?? 'ACTIVE'),
                         ],
                       ],
@@ -183,7 +227,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Card(
                   elevation: 0,
                   color: const Color(0xFFF3F7FB),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -191,23 +237,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         const Text(
                           'Thông tin hệ thống',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF17365D)),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF17365D),
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
                             Icon(
-                              isHealthy ? Icons.check_circle : Icons.offline_bolt,
+                              isHealthy
+                                  ? Icons.check_circle
+                                  : Icons.offline_bolt,
                               color: isHealthy ? Colors.green : Colors.orange,
                               size: 16,
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              isHealthy ? 'API Gateway đang hoạt động (Healthy)' : 'Chế độ Demo / Offline',
+                              isHealthy
+                                  ? 'API Gateway đang hoạt động (Healthy)'
+                                  : 'Chế độ Demo / Offline',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: isHealthy ? Colors.green.shade800 : Colors.orange.shade900,
+                                color: isHealthy
+                                    ? Colors.green.shade800
+                                    : Colors.orange.shade900,
                               ),
                             ),
                           ],
@@ -215,12 +271,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'Endpoint: ${AppConfig.baseUrl}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Phiên bản ứng dụng: ${AppConfig.appVersion}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                       ],
                     ),
@@ -231,10 +293,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 OutlinedButton.icon(
                   onPressed: () => widget.authController.logout(),
                   icon: const Icon(Icons.logout, color: Colors.red),
-                  label: const Text('Đăng xuất khỏi tài khoản', style: TextStyle(color: Colors.red)),
+                  label: const Text(
+                    'Đăng xuất khỏi tài khoản',
+                    style: TextStyle(color: Colors.red),
+                  ),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.red),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ],
@@ -253,10 +321,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           SizedBox(
             width: 120,
-            child: Text(label, style: const TextStyle(color: Colors.black54, fontSize: 13)),
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.black54, fontSize: 13),
+            ),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
           ),
         ],
       ),

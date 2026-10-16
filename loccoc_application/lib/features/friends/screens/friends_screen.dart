@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../friends_controller.dart';
 
 class FriendsScreen extends StatefulWidget {
@@ -11,7 +13,8 @@ class FriendsScreen extends StatefulWidget {
   State<FriendsScreen> createState() => _FriendsScreenState();
 }
 
-class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProviderStateMixin {
+class _FriendsScreenState extends State<FriendsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
@@ -52,7 +55,10 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
           'Người dùng bị chặn sẽ không thể xem bài viết của bạn, không thể gửi tin nhắn hoặc kết bạn.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
@@ -65,9 +71,8 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
     if (confirmed == true) {
       final ok = await widget.controller.blockUser(userId);
       if (ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Đã chặn $name thành công')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Đã chặn $name thành công')));
       }
     }
   }
@@ -81,7 +86,10 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Bạn bè & Kết nối', style: TextStyle(fontWeight: FontWeight.bold)),
+            title: const Text(
+              'Bạn bè & Kết nối',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             backgroundColor: const Color(0xFF17365D),
             foregroundColor: Colors.white,
             bottom: PreferredSize(
@@ -90,7 +98,10 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                 children: [
                   // Search Bar
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -101,12 +112,20 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                         onChanged: _onSearchChanged,
                         decoration: InputDecoration(
                           hintText: 'Tìm kiếm username hoặc tên...',
-                          prefixIcon: const Icon(Icons.search, color: Color(0xFF17365D)),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: Color(0xFF17365D),
+                          ),
                           suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(icon: const Icon(Icons.clear), onPressed: _clearSearch)
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: _clearSearch,
+                                )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                          ),
                         ),
                       ),
                     ),
@@ -130,18 +149,34 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
               ),
             ),
           ),
+          bottomNavigationBar: ctrl.errorMessage == null
+              ? null
+              : MaterialBanner(
+                  content: Text(ctrl.errorMessage!),
+                  actions: [
+                    TextButton(
+                      onPressed: () async {
+                        await ctrl.loadAll();
+                        if (_searchController.text.trim().isNotEmpty) {
+                          await ctrl.searchUsers(_searchController.text);
+                        }
+                      },
+                      child: const Text('Thử lại'),
+                    ),
+                  ],
+                ),
           body: ctrl.isLoading
               ? const Center(child: CircularProgressIndicator())
               : _searchController.text.trim().isNotEmpty
-                  ? _buildSearchResults(ctrl)
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildFriendsTab(ctrl),
-                        _buildRequestsTab(ctrl),
-                        _buildBlockedTab(ctrl),
-                      ],
-                    ),
+              ? _buildSearchResults(ctrl)
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildFriendsTab(ctrl),
+                    _buildRequestsTab(ctrl),
+                    _buildBlockedTab(ctrl),
+                  ],
+                ),
         );
       },
     );
@@ -157,7 +192,11 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.person_search_outlined, size: 64, color: Colors.grey.shade400),
+            Icon(
+              Icons.person_search_outlined,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
             const SizedBox(height: 12),
             Text(
               'Không tìm thấy người dùng khớp với "${_searchController.text}"',
@@ -180,39 +219,69 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
           leading: CircleAvatar(
             backgroundColor: const Color(0xFF17365D),
             foregroundColor: Colors.white,
-            child: Text(user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : 'U'),
+            child: Text(
+              user.displayName.isNotEmpty
+                  ? user.displayName[0].toUpperCase()
+                  : 'U',
+            ),
           ),
-          title: Text(user.displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
+          title: Text(
+            user.displayName,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           subtitle: Text('@${user.username}'),
           trailing: item.isBlocked
-              ? const Chip(label: Text('Đã chặn', style: TextStyle(fontSize: 12, color: Colors.red)))
+              ? const Chip(
+                  label: Text(
+                    'Đã chặn',
+                    style: TextStyle(fontSize: 12, color: Colors.red),
+                  ),
+                )
               : item.areFriends
-                  ? const Chip(label: Text('Bạn bè', style: TextStyle(fontSize: 12, color: Colors.green)))
-                  : item.pendingRequestId != null
-                      ? const Chip(label: Text('Đang chờ', style: TextStyle(fontSize: 12, color: Colors.orange)))
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            FilledButton.tonal(
-                              onPressed: () async {
-                                final messenger = ScaffoldMessenger.of(this.context);
-                                final ok = await ctrl.sendFriendRequest(user.id);
-                                if (ok && mounted) {
-                                  messenger.showSnackBar(
-                                    SnackBar(content: Text('Đã gửi lời mời đến ${user.displayName}')),
-                                  );
-                                  _onSearchChanged(_searchController.text);
-                                }
-                              },
-                              child: const Text('Kết bạn'),
+              ? const Chip(
+                  label: Text(
+                    'Bạn bè',
+                    style: TextStyle(fontSize: 12, color: Colors.green),
+                  ),
+                )
+              : item.pendingRequestId != null
+              ? const Chip(
+                  label: Text(
+                    'Đang chờ',
+                    style: TextStyle(fontSize: 12, color: Colors.orange),
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: () async {
+                        final messenger = ScaffoldMessenger.of(this.context);
+                        final ok = await ctrl.sendFriendRequest(user.id);
+                        if (ok && mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Đã gửi lời mời đến ${user.displayName}',
+                              ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.block, size: 20, color: Colors.grey),
-                              tooltip: 'Chặn',
-                              onPressed: () => _confirmBlock(user.id, user.displayName),
-                            ),
-                          ],
-                        ),
+                          );
+                          _onSearchChanged(_searchController.text);
+                        }
+                      },
+                      child: const Text('Kết bạn'),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.block,
+                        size: 20,
+                        color: Colors.grey,
+                      ),
+                      tooltip: 'Chặn',
+                      onPressed: () => _confirmBlock(user.id, user.displayName),
+                    ),
+                  ],
+                ),
         );
       },
     );
@@ -230,16 +299,27 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.people_outline, size: 72, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.people_outline,
+                      size: 72,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'Bạn chưa có người bạn nào',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       'Tìm kiếm username ở trên để gửi lời mời kết bạn!',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -262,10 +342,19 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
             leading: CircleAvatar(
               backgroundColor: const Color(0xFF17365D),
               foregroundColor: Colors.white,
-              child: Text(friend.displayName.isNotEmpty ? friend.displayName[0].toUpperCase() : 'U'),
+              child: Text(
+                friend.displayName.isNotEmpty
+                    ? friend.displayName[0].toUpperCase()
+                    : 'U',
+              ),
             ),
-            title: Text(friend.displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('@${friend.username} ${friend.bio != null ? "• ${friend.bio}" : ""}'),
+            title: Text(
+              friend.displayName,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              '@${friend.username} ${friend.bio != null ? "• ${friend.bio}" : ""}',
+            ),
             trailing: PopupMenuButton<String>(
               onSelected: (val) {
                 if (val == 'block') {
@@ -279,7 +368,10 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                     children: [
                       Icon(Icons.block, color: Colors.red, size: 20),
                       SizedBox(width: 8),
-                      Text('Chặn người này', style: TextStyle(color: Colors.red)),
+                      Text(
+                        'Chặn người này',
+                        style: TextStyle(color: Colors.red),
+                      ),
                     ],
                   ),
                 ),
@@ -303,11 +395,27 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.mail_outline, size: 72, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.mail_outline,
+                      size: 72,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(height: 16),
-                    const Text('Không có lời mời kết bạn nào', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Không có lời mời kết bạn nào',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 6),
-                    Text('Lời mời kết bạn gửi đến hoặc đã gửi sẽ xuất hiện ở đây.', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                    Text(
+                      'Lời mời kết bạn gửi đến hoặc đã gửi sẽ xuất hiện ở đây.',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -325,14 +433,20 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
           if (ctrl.incomingRequests.isNotEmpty) ...[
             const Text(
               'Lời mời đã nhận',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF17365D)),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Color(0xFF17365D),
+              ),
             ),
             const SizedBox(height: 8),
             ...ctrl.incomingRequests.map((req) {
               return Card(
                 elevation: 1,
                 margin: const EdgeInsets.only(bottom: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
@@ -347,20 +461,37 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Người dùng #${req.senderId}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text(
+                              'Người dùng #${req.senderId}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             const SizedBox(height: 2),
-                            Text('Đã gửi lời mời kết bạn', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                            Text(
+                              'Đã gửi lời mời kết bạn',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                       FilledButton(
-                        onPressed: () => ctrl.acceptFriendRequest(req.id),
-                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFF17365D)),
+                        onPressed: ctrl.isPending('request:${req.id}')
+                            ? null
+                            : () => ctrl.acceptFriendRequest(req.id),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF17365D),
+                        ),
                         child: const Text('Đồng ý'),
                       ),
                       const SizedBox(width: 6),
                       OutlinedButton(
-                        onPressed: () => ctrl.declineFriendRequest(req.id),
+                        onPressed: ctrl.isPending('request:${req.id}')
+                            ? null
+                            : () => ctrl.declineFriendRequest(req.id),
                         child: const Text('Từ chối'),
                       ),
                     ],
@@ -374,7 +505,11 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
           if (ctrl.outgoingRequests.isNotEmpty) ...[
             const Text(
               'Lời mời đã gửi',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF17365D)),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Color(0xFF17365D),
+              ),
             ),
             const SizedBox(height: 8),
             ...ctrl.outgoingRequests.map((req) {
@@ -382,12 +517,24 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                 elevation: 0,
                 color: Colors.grey.shade100,
                 margin: const EdgeInsets.only(bottom: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: ListTile(
-                  leading: const Icon(Icons.send_rounded, color: Colors.blueGrey),
-                  title: Text('Đang chờ người dùng #${req.receiverId} phản hồi'),
+                  leading: const Icon(
+                    Icons.send_rounded,
+                    color: Colors.blueGrey,
+                  ),
+                  title: Text(
+                    'Đang chờ người dùng #${req.receiverId} phản hồi',
+                  ),
                   subtitle: Text('Trạng thái: ${req.status}'),
-                  trailing: const Chip(label: Text('Đã gửi', style: TextStyle(fontSize: 11))),
+                  trailing: TextButton(
+                    onPressed: ctrl.isPending('request:${req.id}')
+                        ? null
+                        : () => ctrl.cancelFriendRequest(req.id),
+                    child: const Text('Hủy lời mời'),
+                  ),
                 ),
               );
             }),
@@ -409,11 +556,27 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.shield_outlined, size: 72, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.shield_outlined,
+                      size: 72,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(height: 16),
-                    const Text('Danh sách chặn trống', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Danh sách chặn trống',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 6),
-                    Text('Bạn chưa chặn người dùng nào.', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                    Text(
+                      'Bạn chưa chặn người dùng nào.',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -437,7 +600,10 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
               foregroundColor: Colors.white,
               child: Icon(Icons.block, size: 20),
             ),
-            title: Text('Người dùng bị chặn #${block.blockedId}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            title: Text(
+              'Người dùng bị chặn #${block.blockedId}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
             trailing: OutlinedButton(
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(this.context);

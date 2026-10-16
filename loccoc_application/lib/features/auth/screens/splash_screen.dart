@@ -44,10 +44,7 @@ class SplashScreen extends StatelessWidget {
             const SizedBox(height: 8),
             const Text(
               'Chia sẻ khoảnh khắc cùng bạn bè',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white70,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.white70),
             ),
             const SizedBox(height: 48),
             const CircularProgressIndicator(

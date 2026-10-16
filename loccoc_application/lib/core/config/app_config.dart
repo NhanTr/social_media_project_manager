@@ -1,7 +1,19 @@
 import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AppConfig {
+  static const googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+  );
+  static const googleIosClientId = String.fromEnvironment(
+    'GOOGLE_IOS_CLIENT_ID',
+  );
+  static const environment = String.fromEnvironment(
+    'APP_ENV',
+    defaultValue: 'dev',
+  );
+  static const _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const String appName = 'LocCoc';
   static const String appVersion = '0.1.0-beta.1';
 
@@ -18,5 +30,7 @@ class AppConfig {
     return 'http://localhost:8080';
   }
 
-  static String baseUrl = defaultBaseUrl;
+  static String baseUrl = _configuredBaseUrl.isNotEmpty
+      ? _configuredBaseUrl
+      : defaultBaseUrl;
 }

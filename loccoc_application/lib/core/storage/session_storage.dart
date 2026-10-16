@@ -1,6 +1,21 @@
+import 'dart:convert';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SessionStorage {
+  final FlutterSecureStorage _secure = const FlutterSecureStorage();
+  static const _keyTokens = 'loccoc_tokens';
+
+  Future<Map<String, dynamic>> _tokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Old plaintext sessions require login again after this security upgrade.
+    await prefs.remove(_keyAccessToken);
+    await prefs.remove(_keyRefreshToken);
+    final value = await _secure.read(key: _keyTokens);
+    return value == null ? {} : jsonDecode(value) as Map<String, dynamic>;
+  }
+
   static const String _keyAccessToken = 'loccoc_access_token';
   static const String _keyRefreshToken = 'loccoc_refresh_token';
   static const String _keyUserId = 'loccoc_user_id';
@@ -17,8 +32,15 @@ class SessionStorage {
     required bool requiresTerms,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyAccessToken, accessToken);
-    await prefs.setString(_keyRefreshToken, refreshToken);
+    await _secure.write(
+      key: _keyTokens,
+      value: jsonEncode({
+        'accessToken': accessToken,
+        'refreshToken': refreshToken,
+      }),
+    );
+    await prefs.remove(_keyAccessToken);
+    await prefs.remove(_keyRefreshToken);
     await prefs.setInt(_keyUserId, userId);
     await prefs.setString(_keyUsername, username);
     await prefs.setString(_keyDisplayName, displayName);
@@ -30,8 +52,15 @@ class SessionStorage {
     required String refreshToken,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyAccessToken, accessToken);
-    await prefs.setString(_keyRefreshToken, refreshToken);
+    await _secure.write(
+      key: _keyTokens,
+      value: jsonEncode({
+        'accessToken': accessToken,
+        'refreshToken': refreshToken,
+      }),
+    );
+    await prefs.remove(_keyAccessToken);
+    await prefs.remove(_keyRefreshToken);
   }
 
   Future<void> setTermsAccepted() async {
@@ -40,13 +69,11 @@ class SessionStorage {
   }
 
   Future<String?> getAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyAccessToken);
+    return (await _tokens())['accessToken'] as String?;
   }
 
   Future<String?> getRefreshToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyRefreshToken);
+    return (await _tokens())['refreshToken'] as String?;
   }
 
   Future<int?> getUserId() async {
@@ -70,6 +97,7 @@ class SessionStorage {
   }
 
   Future<void> clear() async {
+    await _secure.delete(key: _keyTokens);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyAccessToken);
     await prefs.remove(_keyRefreshToken);
