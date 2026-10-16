@@ -144,3 +144,8 @@ Kafka chưa bắt buộc cho MVP; transactional outbox + worker REST đã đủ 
 - `ProblemDetail` nhất quán và có `X-Request-Id`.
 - Có metrics/log nhưng không ghi token, OTP hoặc PII nhạy cảm.
 - Swift client gọi được, có loading/empty/error/offline state phù hợp.
+
+
+## Cập nhật triển khai 16/10/2026
+
+Đã bổ sung cancel request (API + migration + Flutter), sửa OTP/social contract, secure token storage, refresh GETDEL, OTP cooldown/attempt limit và test routing độc lập mạng. CI có migration DB rỗng/validate và artifacts. Các bước Google OAuth credentials, demo Android/iOS, Terms gate trên API nghiệp vụ, concurrency block-vs-accept và review nhóm vẫn cần nghiệm thu; không coi unit test là end-to-end evidence.

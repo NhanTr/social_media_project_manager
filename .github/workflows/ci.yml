@@ -6,9 +6,17 @@ on:
   pull_request:
     branches: [ main, dev ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   flutter-quality-gate:
     name: Flutter Lint & Unit Tests
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -26,18 +34,31 @@ jobs:
           cd loccoc_application
           flutter pub get
 
+      - name: Check Flutter format
+        working-directory: loccoc_application
+        run: dart format --output=none --set-exit-if-changed lib test
+
       - name: Run Flutter analyzer
         run: |
           cd loccoc_application
-          flutter analyze --no-fatal-infos
+          flutter analyze
 
       - name: Run Flutter unit & widget tests
         run: |
           cd loccoc_application
-          flutter test --coverage
+          flutter test --coverage --timeout 30s
+
+      - name: Upload Flutter coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-coverage
+          path: loccoc_application/coverage/
+          if-no-files-found: ignore
 
   backend-quality-gate:
     name: Backend Build & Unit Tests
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -53,10 +74,45 @@ jobs:
       - name: Run Maven build and tests
         run: |
           cd backend
-          mvn -B clean test
+          mvn -B clean verify
+
+      - name: Upload backend test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: backend/**/target/surefire-reports/
+
+  migration-quality-gate:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: social_media_ai_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-password
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d social_media_ai_db"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Migrate empty database and validate checksums
+        run: |
+          for operation in migrate validate; do
+            docker run --rm --network host \
+              -v "$PWD/backend/database/migration:/flyway/sql:ro" \
+              redgate/flyway:11-alpine \
+              -url=jdbc:postgresql://localhost:5432/social_media_ai_db \
+              -user=postgres -password=ci-only-password "$operation"
+          done
 
   security-and-conventions:
     name: Security Scan & Conventions
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -66,3 +122,15 @@ jobs:
         run: |
           echo "Scanning for accidental hardcoded secrets..."
           ! grep -rnE --exclude-dir={.git,target,.dart_tool} "BEGIN (RSA|EC|DSA|OPENSSH) PRIVATE KEY" .
+
+      - name: Check conventional PR title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          title = os.environ['PR_TITLE']
+          if not re.match(r'^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: .+', title):
+              raise SystemExit('PR title must follow Conventional Commits.')
+          PY

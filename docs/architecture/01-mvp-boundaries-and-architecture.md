@@ -6,7 +6,7 @@ Tài liệu thiết kế kiến trúc theo thẻ Trello **`LC-S0-02`** — Chố
 
 1. **Monorepo**: Cấu trúc gồm `backend/` (Maven multi-module) và `loccoc_application/` (Flutter mobile app).
 2. **Giao tiếp liên dịch vụ**: Giao tiếp nội bộ sử dụng REST đồng bộ với Header `X-Internal-Api-Key`. Không dùng Kafka/RabbitMQ trong MVP để giảm thiểu độ phức tạp vận hành.
-3. **Cơ sở dữ liệu**: Dùng một cụm PostgreSQL với schema riêng biệt cho từng service theo nguyên tắc data ownership:
+3. **Cơ sở dữ liệu**: Thiết kế đích dùng một cụm PostgreSQL với schema riêng theo service. Implementation hiện dùng các bảng trong schema public và grant theo service; việc tách schema chưa hoàn thành. Ownership dự kiến:
    - `identity_service`: `users`, `terms_versions`, `user_terms_acceptance`, `account_deletion_requests`
    - `social_service`: `friend_requests`, `friendships`, `blocks`
    - `post_service`: `posts`, `saved_posts`, `media`
@@ -31,3 +31,38 @@ Tài liệu thiết kế kiến trúc theo thẻ Trello **`LC-S0-02`** — Chố
 - Tích hợp SMS OTP nhà mạng thật (dùng OTP mock trong MVP).
 - Tích hợp AI provider trả phí (dùng Fake AI Generator Worker).
 - Service Mesh (Istio), Kubernetes, Kafka.
+
+
+## 3. Context và dependency hiện tại
+
+```mermaid
+flowchart LR
+    Mobile[Flutter Android / iOS] --> Gateway[API Gateway :8080]
+    Gateway --> Identity[Identity :8081]
+    Gateway --> Social[Social :8082]
+    Gateway --> Post[Post :8083]
+    Gateway --> Notification[Notification :8084]
+    Gateway --> Chat[Chat :8085]
+    Gateway --> AI[AI mock :8086]
+    Gateway --> Moderation[Moderation :8087]
+    Social --> Identity
+    Post --> Social
+    Chat --> Social
+    Social --> Notification
+    Post --> Notification
+    Chat --> Notification
+    Identity --> Redis[(Redis OTP / refresh)]
+    Post --> MinIO[(MinIO)]
+    Identity --> DB[(PostgreSQL)]
+    Social --> DB
+    Post --> DB
+    Chat --> DB
+    Notification --> DB
+    AI --> DB
+    Moderation --> DB
+```
+
+Sáu bounded context trong kế hoạch không đồng nghĩa sáu process hiện tại:
+User được triển khai bằng Identity + Social; AI hiện tách khỏi Post;
+Admin tương ứng Moderation; Subscription chưa triển khai. Đây là hiện trạng
+để nhóm review, chưa phải xác nhận chấp thuận thay đổi scope/schema.
