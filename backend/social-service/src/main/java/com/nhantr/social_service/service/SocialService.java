@@ -128,12 +128,17 @@ public class SocialService {
         if (!identityClient.exists(blockedId)) {
             throw ApiException.notFound("USER_NOT_FOUND", "User does not exist.");
         }
+        List<FriendRequest> pendingRequests = requestRepository.findAllPairByStatusForUpdate(
+                blockerId,
+                blockedId,
+                FriendRequest.Status.PENDING
+        );
         Block block = blockRepository.findByBlockerIdAndBlockedId(blockerId, blockedId)
                 .orElseGet(() -> blockRepository.save(new Block(blockerId, blockedId)));
         long a = Math.min(blockerId, blockedId);
         long b = Math.max(blockerId, blockedId);
         friendshipRepository.findByUserIdAAndUserIdB(a, b).ifPresent(friendshipRepository::delete);
-        requestRepository.findAllPairByStatus(blockerId, blockedId, FriendRequest.Status.PENDING).forEach(request -> {
+        pendingRequests.forEach(request -> {
             request.setStatus(FriendRequest.Status.DECLINED);
             requestRepository.save(request);
         });

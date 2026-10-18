@@ -29,12 +29,13 @@ public interface FriendRequestRepository extends JpaRepository<FriendRequest, Lo
             @Param("status") FriendRequest.Status status
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select r from FriendRequest r
             where r.status = :status
               and ((r.senderId = :a and r.receiverId = :b) or (r.senderId = :b and r.receiverId = :a))
             """)
-    List<FriendRequest> findAllPairByStatus(
+    List<FriendRequest> findAllPairByStatusForUpdate(
             @Param("a") Long a,
             @Param("b") Long b,
             @Param("status") FriendRequest.Status status
