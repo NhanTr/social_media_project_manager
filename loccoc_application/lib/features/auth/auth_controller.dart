@@ -218,9 +218,18 @@ class AuthController extends ChangeNotifier {
       );
 
       if (res.success) {
+        final refreshed = await _api.refreshAccessToken();
+        if (!refreshed) {
+          _status = AuthStatus.requiresTerms;
+          _errorMessage =
+              'Đã ghi nhận điều khoản nhưng chưa thể làm mới phiên. Vui lòng thử lại.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
         await _storage.setTermsAccepted();
-        _status = AuthStatus.authenticated;
         await refreshProfile();
+        _status = AuthStatus.authenticated;
         _isLoading = false;
         notifyListeners();
         return true;

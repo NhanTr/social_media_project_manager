@@ -111,6 +111,10 @@ class ApiClient {
     );
   }
 
+  Future<bool> refreshAccessToken() async {
+    return await _refreshTokenSingleFlight() != null;
+  }
+
   Future<ApiResponse<dynamic>> _sendRequest(
     Future<http.Response> Function(String? token) execute,
   ) async {
