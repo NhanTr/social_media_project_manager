@@ -31,7 +31,7 @@ public class BearerTokenFilter extends OncePerRequestFilter {
         if (request.getRequestURI().startsWith("/internal/")) {
             String supplied = request.getHeader("X-Internal-Api-Key");
             if (internalApiKey != null && !internalApiKey.isBlank() && internalApiKey.equals(supplied)) {
-                authenticate(new CurrentUser(-1L, "SERVICE"), "ROLE_SERVICE");
+                authenticate(new CurrentUser(-1L, "SERVICE", true), "ROLE_SERVICE");
             }
             chain.doFilter(request, response);
             return;
@@ -44,8 +44,10 @@ public class BearerTokenFilter extends OncePerRequestFilter {
                 String tokenType = claims.get("token_type", String.class);
                 if ("access".equals(tokenType) || "admin".equals(tokenType)) {
                     String role = claims.get("role", String.class);
+                    boolean termsAccepted = "admin".equals(tokenType)
+                            || Boolean.TRUE.equals(claims.get("terms_accepted", Boolean.class));
                     authenticate(
-                            new CurrentUser(Long.valueOf(claims.getSubject()), role),
+                            new CurrentUser(Long.valueOf(claims.getSubject()), role, termsAccepted),
                             "ROLE_" + (role == null ? "USER" : role)
                     );
                 }

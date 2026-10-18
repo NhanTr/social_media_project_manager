@@ -69,7 +69,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             if (!"access".equals(claims.get("token_type", String.class))) {
                 throw new AccessDeniedException("Access token is required.");
             }
-            CurrentUser user = new CurrentUser(Long.valueOf(claims.getSubject()), "USER");
+            CurrentUser user = new CurrentUser(
+                    Long.valueOf(claims.getSubject()),
+                    "USER",
+                    Boolean.TRUE.equals(claims.get("terms_accepted", Boolean.class))
+            );
             accessor.setUser(new UsernamePasswordAuthenticationToken(user, null, List.of()));
         } catch (JwtException | IllegalArgumentException exception) {
             throw new AccessDeniedException("Bearer token is invalid.");

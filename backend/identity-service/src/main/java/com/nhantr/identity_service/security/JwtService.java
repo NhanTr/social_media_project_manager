@@ -30,12 +30,12 @@ public class JwtService {
         this.refreshTokenTtl = Duration.ofDays(refreshTokenExpirationDays);
     }
 
-    public String createAccessToken(Long userId) {
-        return createToken(userId, "access", accessTokenTtl, UUID.randomUUID().toString());
+    public String createAccessToken(Long userId, boolean termsAccepted) {
+        return createToken(userId, "access", accessTokenTtl, UUID.randomUUID().toString(), termsAccepted);
     }
 
     public String createRefreshToken(Long userId, String tokenId) {
-        return createToken(userId, "refresh", refreshTokenTtl, tokenId);
+        return createToken(userId, "refresh", refreshTokenTtl, tokenId, null);
     }
 
     public Claims parseToken(String token) {
@@ -66,16 +66,26 @@ public class JwtService {
         return refreshTokenTtl;
     }
 
-    private String createToken(Long userId, String tokenType, Duration ttl, String tokenId) {
+    private String createToken(
+            Long userId,
+            String tokenType,
+            Duration ttl,
+            String tokenId,
+            Boolean termsAccepted
+    ) {
         Instant now = Instant.now();
         Instant expiresAt = now.plus(ttl);
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .id(tokenId)
                 .subject(String.valueOf(userId))
                 .claim("token_type", tokenType)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(expiresAt))
+                .expiration(Date.from(expiresAt));
+        if (termsAccepted != null) {
+            builder.claim("terms_accepted", termsAccepted);
+        }
+        return builder
                 .signWith(secretKey)
                 .compact();
     }

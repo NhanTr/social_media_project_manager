@@ -13,10 +13,18 @@ class JwtServiceTests {
 
     @Test
     void createsAccessTokenWithExpectedSubjectAndType() {
-        String token = jwt.createAccessToken(42L);
+        String token = jwt.createAccessToken(42L, true);
         var claims = jwt.parseToken(token);
         assertThat(jwt.getUserId(claims)).isEqualTo(42L);
         assertThat(jwt.getTokenType(claims)).isEqualTo("access");
+        assertThat(claims.get("terms_accepted", Boolean.class)).isTrue();
+    }
+
+    @Test
+    void createsAccessTokenWithRejectedTermsState() {
+        String token = jwt.createAccessToken(42L, false);
+        var claims = jwt.parseToken(token);
+        assertThat(claims.get("terms_accepted", Boolean.class)).isFalse();
     }
 
     @Test

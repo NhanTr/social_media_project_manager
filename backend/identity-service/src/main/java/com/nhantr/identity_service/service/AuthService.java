@@ -142,7 +142,8 @@ public class AuthService {
     private AuthResponse createAuthResponse(User user) {
         requireActive(user);
         String refreshTokenId = UUID.randomUUID().toString();
-        String accessToken = jwtService.createAccessToken(user.getId());
+        boolean termsAccepted = termsService.hasAcceptedLatest(user.getId());
+        String accessToken = jwtService.createAccessToken(user.getId(), termsAccepted);
         String refreshToken = jwtService.createRefreshToken(user.getId(), refreshTokenId);
 
         redisTemplate.opsForValue().set(
@@ -157,7 +158,7 @@ public class AuthService {
                 "Bearer",
                 jwtService.getAccessTokenTtl().toSeconds(),
                 UserResponse.from(user),
-                !termsService.hasAcceptedLatest(user.getId())
+                !termsAccepted
         );
     }
 
