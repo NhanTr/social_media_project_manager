@@ -47,6 +47,7 @@ public class AuthService {
     private final boolean exposeOtpCode;
     private final GoogleTokenVerifier googleTokenVerifier;
     private final TermsService termsService;
+    private final AuthAuditLogger auditLogger;
 
     public AuthService(
             UserRepository userRepository,
@@ -55,7 +56,8 @@ public class AuthService {
             @Value("${app.otp.expiration-minutes}") long otpExpirationMinutes,
             @Value("${app.otp.expose-code:false}") boolean exposeOtpCode,
             GoogleTokenVerifier googleTokenVerifier,
-            TermsService termsService
+            TermsService termsService,
+            AuthAuditLogger auditLogger
     ) {
         this.userRepository = userRepository;
         this.redisTemplate = redisTemplate;
@@ -64,17 +66,20 @@ public class AuthService {
         this.exposeOtpCode = exposeOtpCode;
         this.googleTokenVerifier = googleTokenVerifier;
         this.termsService = termsService;
+        this.auditLogger = auditLogger;
     }
 
     public OtpResponse requestPhoneOtp(PhoneOtpRequest request) {
         String phoneNumber = normalizePhoneNumber(request.phoneNumber());
         if (!Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(
                 otpKey(phoneNumber) + ":cooldown", "1", Duration.ofSeconds(60)))) {
+            audit("otp_request", "rate_limited", null);
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_RATE_LIMITED", "Please wait 60 seconds before requesting another OTP.");
         }
         String otp = String.format(Locale.ROOT, "%06d", SECURE_RANDOM.nextInt(1_000_000));
 
         redisTemplate.opsForValue().set(otpKey(phoneNumber), otp, Duration.ofMinutes(otpExpirationMinutes));
+        audit("otp_request", "accepted", null);
 
         return new OtpResponse(
                 "OTP has been created for the phone login flow.",
@@ -91,9 +96,11 @@ public class AuthService {
                 List.of(otpKey(phoneNumber), otpKey(phoneNumber) + ":attempts"),
                 submittedOtp, Long.toString(otpExpirationMinutes * 60));
         if (Long.valueOf(-1).equals(result)) {
+            audit("otp_verification", "attempt_limit", null);
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_ATTEMPTS_EXCEEDED", "Too many OTP attempts. Try again later.");
         }
         if (!Long.valueOf(1).equals(result)) {
+            audit("otp_verification", "failed", null);
             throw ApiException.badRequest("OTP_INVALID", "OTP is invalid or expired.");
         }
 
@@ -102,40 +109,62 @@ public class AuthService {
         user.setLastLoginAt(Instant.now());
         User savedUser = userRepository.save(user);
 
-        return createAuthResponse(savedUser);
+        AuthResponse response = createAuthResponse(savedUser);
+        audit("otp_verification", "succeeded", savedUser.getId());
+        return response;
     }
 
     public AuthResponse refreshToken(RefreshTokenRequest request) {
-        String refreshToken = requireText(request.refreshToken(), "refreshToken");
-        Claims claims = jwtService.parseToken(refreshToken);
+        Long auditUserId = null;
+        try {
+            String refreshToken = requireText(request.refreshToken(), "refreshToken");
+            Claims claims = jwtService.parseToken(refreshToken);
 
-        if (!"refresh".equals(jwtService.getTokenType(claims))) {
-            throw new IllegalArgumentException("Refresh token is invalid.");
+            if (!"refresh".equals(jwtService.getTokenType(claims))) {
+                throw new IllegalArgumentException("Refresh token is invalid.");
+            }
+
+            Long userId = jwtService.getUserId(claims);
+            auditUserId = userId;
+            String tokenId = jwtService.getTokenId(claims);
+            String refreshKey = refreshTokenKey(userId, tokenId);
+            String savedToken = redisTemplate.opsForValue().getAndDelete(refreshKey);
+
+            if (!refreshToken.equals(savedToken)) {
+                throw new IllegalArgumentException("Refresh token is expired or revoked.");
+            }
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+            requireActive(user);
+            AuthResponse response = createAuthResponse(user);
+            audit("token_refresh", "succeeded", userId);
+            return response;
+        } catch (RuntimeException exception) {
+            audit("token_refresh", "rejected", auditUserId);
+            throw exception;
         }
-
-        Long userId = jwtService.getUserId(claims);
-        String tokenId = jwtService.getTokenId(claims);
-        String refreshKey = refreshTokenKey(userId, tokenId);
-        String savedToken = redisTemplate.opsForValue().getAndDelete(refreshKey);
-
-        if (!refreshToken.equals(savedToken)) {
-            throw new IllegalArgumentException("Refresh token is expired or revoked.");
-        }
-
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
-
-        requireActive(user);
-        return createAuthResponse(user);
     }
 
     public void logout(RefreshTokenRequest request) {
-        String refreshToken = requireText(request.refreshToken(), "refreshToken");
-        Claims claims = jwtService.parseToken(refreshToken);
+        Long auditUserId = null;
+        try {
+            String refreshToken = requireText(request.refreshToken(), "refreshToken");
+            Claims claims = jwtService.parseToken(refreshToken);
 
-        if ("refresh".equals(jwtService.getTokenType(claims))) {
-            redisTemplate.delete(refreshTokenKey(jwtService.getUserId(claims), jwtService.getTokenId(claims)));
+            if ("refresh".equals(jwtService.getTokenType(claims))) {
+                auditUserId = jwtService.getUserId(claims);
+                boolean revoked = Boolean.TRUE.equals(redisTemplate.delete(
+                        refreshTokenKey(auditUserId, jwtService.getTokenId(claims))
+                ));
+                audit("logout", revoked ? "revoked" : "absent", auditUserId);
+                return;
+            }
+            audit("logout", "absent", null);
+        } catch (RuntimeException exception) {
+            audit("logout", "absent", auditUserId);
+            throw exception;
         }
     }
 
@@ -164,33 +193,42 @@ public class AuthService {
 
     @Transactional
     public AuthResponse loginWithGoogle(GoogleLoginRequest request) {
-        String idToken = requireText(request.idToken(), "idToken");
-        var payload = googleTokenVerifier.verify(idToken);
+        Long auditUserId = null;
+        try {
+            String idToken = requireText(request.idToken(), "idToken");
+            var payload = googleTokenVerifier.verify(idToken);
 
-        String googleId = payload.getSubject();
-        String email = payload.getEmail();
-        String displayName = (String) payload.get("name");
-        String avatarUrl = (String) payload.get("picture");
+            String googleId = payload.getSubject();
+            String email = payload.getEmail();
+            String displayName = (String) payload.get("name");
+            String avatarUrl = (String) payload.get("picture");
 
-        User user = userRepository.findByGoogleId(googleId)
-                .orElseGet(() -> createGoogleUser(googleId, email, displayName, avatarUrl));
+            User user = userRepository.findByGoogleId(googleId)
+                    .orElseGet(() -> createGoogleUser(googleId, email, displayName, avatarUrl));
 
-        user.setLastLoginAt(Instant.now());
+            user.setLastLoginAt(Instant.now());
 
-        if (user.getEmail() == null && email != null) {
-            user.setEmail(email);
+            if (user.getEmail() == null && email != null) {
+                user.setEmail(email);
+            }
+
+            if (user.getDisplayName() == null && displayName != null) {
+                user.setDisplayName(displayName);
+            }
+
+            if (user.getAvatarUrl() == null && avatarUrl != null) {
+                user.setAvatarUrl(avatarUrl);
+            }
+
+            User savedUser = userRepository.save(user);
+            auditUserId = savedUser.getId();
+            AuthResponse response = createAuthResponse(savedUser);
+            audit("google_login", "succeeded", auditUserId);
+            return response;
+        } catch (RuntimeException exception) {
+            audit("google_login", "failed", auditUserId);
+            throw exception;
         }
-
-        if (user.getDisplayName() == null && displayName != null) {
-            user.setDisplayName(displayName);
-        }
-
-        if (user.getAvatarUrl() == null && avatarUrl != null) {
-            user.setAvatarUrl(avatarUrl);
-        }
-
-        User savedUser = userRepository.save(user);
-        return createAuthResponse(savedUser);
     }
 
     private User createGoogleUser(
@@ -313,6 +351,14 @@ public class AuthService {
     private void requireActive(User user) {
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new IllegalArgumentException("Account is not active.");
+        }
+    }
+
+    private void audit(String event, String outcome, Long userId) {
+        try {
+            auditLogger.record(event, outcome, userId);
+        } catch (RuntimeException ignored) {
+            // Audit failures must never change authentication outcomes.
         }
     }
 }

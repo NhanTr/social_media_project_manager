@@ -16,15 +16,18 @@ public class TermsService {
     private final TermsVersionRepository termsRepository;
     private final UserTermsAcceptanceRepository acceptanceRepository;
     private final UserRepository userRepository;
+    private final AuthAuditLogger auditLogger;
 
     public TermsService(
             TermsVersionRepository termsRepository,
             UserTermsAcceptanceRepository acceptanceRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            AuthAuditLogger auditLogger
     ) {
         this.termsRepository = termsRepository;
         this.acceptanceRepository = acceptanceRepository;
         this.userRepository = userRepository;
+        this.auditLogger = auditLogger;
     }
 
     public TermsResponse latest() {
@@ -54,12 +57,21 @@ public class TermsService {
         if (!acceptanceRepository.existsByUserIdAndTermsVersionId(userId, termsVersionId)) {
             acceptanceRepository.save(new UserTermsAcceptance(userId, termsVersionId));
         }
+        audit("terms_acceptance", "succeeded", userId);
         return new AcceptanceResponse(termsVersionId, Instant.now());
     }
 
     private TermsVersion latestEntity() {
         return termsRepository.findFirstByActiveTrueOrderByPublishedAtDesc()
                 .orElseThrow(() -> ApiException.notFound("TERMS_NOT_FOUND", "No active terms version exists."));
+    }
+
+    private void audit(String event, String outcome, Long userId) {
+        try {
+            auditLogger.record(event, outcome, userId);
+        } catch (RuntimeException ignored) {
+            // Audit failures must never change Terms acceptance outcomes.
+        }
     }
 
     public record TermsResponse(Long id, String version, String contentUrl, Instant publishedAt) {}
