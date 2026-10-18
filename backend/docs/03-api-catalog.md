@@ -21,6 +21,10 @@ Public endpoint không cần token:
 - `GET /api/v1/terms/latest`
 - `POST /api/v1/admin/auth/login`
 
+Access token của user có claim Boolean `terms_accepted`. Token cũ không có claim này được xem là chưa chấp nhận điều khoản. Gateway chỉ cho user chưa chấp nhận gọi nhóm `/api/v1/auth/**`, `GET /api/v1/terms/latest` và `POST /api/v1/terms/accept`; health, tài liệu API, internal API và admin API cũng được miễn kiểm tra này. Các API user khác trả về `403` với `code: TERMS_ACCEPTANCE_REQUIRED`.
+
+Sau khi `POST /api/v1/terms/accept` thành công, client phải gọi `POST /api/v1/auth/refresh` và lưu cặp token mới trước khi chuyển vào luồng ứng dụng chính. Nếu refresh thất bại, client giữ người dùng ở màn hình Terms để thử lại.
+
 ### Pagination
 
 Feed, message và notification dùng cursor:
@@ -48,6 +52,19 @@ Không parse hoặc tự tạo cursor ở client; chỉ gửi lại giá trị s
   "fieldErrors": {
     "field": "validation message"
   }
+}
+```
+
+Ví dụ khi access token chưa phản ánh bản Terms mới nhất:
+
+```json
+{
+  "type": "https://loccoc.app/problems/terms_acceptance_required",
+  "title": "TERMS_ACCEPTANCE_REQUIRED",
+  "status": 403,
+  "detail": "Accept the latest Terms of Service before using this endpoint.",
+  "code": "TERMS_ACCEPTANCE_REQUIRED",
+  "requestId": "uuid"
 }
 ```
 

@@ -4,12 +4,32 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 public final class SecuritySupport {
     private SecuritySupport() {
     }
 
     public static SecurityFilterChain serviceChain(
+            HttpSecurity http,
+            BearerTokenFilter bearerTokenFilter,
+            String... publicPaths
+    ) throws Exception {
+        return configure(http, bearerTokenFilter, publicPaths).build();
+    }
+
+    public static SecurityFilterChain serviceChain(
+            HttpSecurity http,
+            BearerTokenFilter bearerTokenFilter,
+            OncePerRequestFilter filterAfterBearer,
+            String... publicPaths
+    ) throws Exception {
+        return configure(http, bearerTokenFilter, publicPaths)
+                .addFilterAfter(filterAfterBearer, BearerTokenFilter.class)
+                .build();
+    }
+
+    private static HttpSecurity configure(
             HttpSecurity http,
             BearerTokenFilter bearerTokenFilter,
             String... publicPaths
@@ -33,6 +53,6 @@ public final class SecuritySupport {
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(bearerTokenFilter, UsernamePasswordAuthenticationFilter.class);
-        return http.build();
+        return http;
     }
 }
