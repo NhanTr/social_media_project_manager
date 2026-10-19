@@ -56,6 +56,8 @@ public class Post {
     private Instant createdAt;
     @Column(name = "updated_at")
     private Instant updatedAt;
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 
     protected Post() {}
     public Post(
@@ -103,5 +105,15 @@ public class Post {
     public Visibility getVisibility() { return visibility; }
     public Status getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getDeletedAt() { return deletedAt; }
     public void setStatus(Status status) { this.status = status; this.updatedAt = Instant.now(); }
+    public void setCaption(String caption) { this.caption = caption; this.updatedAt = Instant.now(); }
+    public void setFilterApplied(String filterApplied) { this.filterApplied = filterApplied; this.updatedAt = Instant.now(); }
+    public void setVisibility(Visibility visibility) { this.visibility = visibility; this.updatedAt = Instant.now(); }
+
+    public void markDeleted() {
+        this.status = Status.DELETED;
+        this.deletedAt = Instant.now();
+        this.updatedAt = Instant.now();
+    }
 }

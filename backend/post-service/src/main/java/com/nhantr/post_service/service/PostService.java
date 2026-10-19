@@ -7,6 +7,7 @@ import com.nhantr.post_service.client.NotificationClient;
 import com.nhantr.post_service.client.SocialClient;
 import com.nhantr.post_service.entity.Post;
 import com.nhantr.post_service.repository.PostRepository;
+import com.nhantr.post_service.storage.MediaCleanupService;
 import jakarta.validation.constraints.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -23,12 +24,20 @@ public class PostService {
     private final SocialClient social;
     private final IdentityClient identity;
     private final NotificationClient notifications;
+    private final MediaCleanupService cleanup;
 
-    public PostService(PostRepository repository, SocialClient social, IdentityClient identity, NotificationClient notifications) {
+    public PostService(
+            PostRepository repository,
+            SocialClient social,
+            IdentityClient identity,
+            NotificationClient notifications,
+            MediaCleanupService cleanup
+    ) {
         this.repository = repository;
         this.social = social;
         this.identity = identity;
         this.notifications = notifications;
+        this.cleanup = cleanup;
     }
 
     @Transactional
@@ -62,6 +71,34 @@ public class PostService {
         Post post = active(postId);
         authorizeView(currentUserId, post);
         return response(post, authorMap(List.of(post.getUserId())));
+    }
+
+    @Transactional
+    public PostResponse update(Long currentUserId, Long postId, UpdatePostRequest request) {
+        Post post = active(postId);
+        requireOwner(currentUserId, post, "Only the owner can update this post.");
+        if (request.caption() != null) post.setCaption(normalize(request.caption()));
+        if (request.filterApplied() != null) post.setFilterApplied(normalize(request.filterApplied()));
+        if (request.visibility() != null) post.setVisibility(request.visibility());
+        return response(repository.save(post), authorMap(List.of(post.getUserId())));
+    }
+
+    /**
+     * Soft delete: ẩn ngay khỏi feed (status=DELETED) và lên lịch xóa media vật lý.
+     */
+    @Transactional
+    public void delete(Long currentUserId, Long postId) {
+        Post post = active(postId);
+        requireOwner(currentUserId, post, "Only the owner can delete this post.");
+        post.markDeleted();
+        repository.save(post);
+        cleanup.enqueueFromMediaUrl(post.getMediaUrl());
+    }
+
+    private void requireOwner(Long currentUserId, Post post, String message) {
+        if (!currentUserId.equals(post.getUserId())) {
+            throw ApiException.forbidden("POST_FORBIDDEN", message);
+        }
     }
 
     public PageResponse<PostResponse> feed(Long userId, String cursor, int requestedLimit) {
@@ -185,6 +222,13 @@ public class PostService {
             @Size(max = 100) String filterApplied,
             Boolean aiGenerated,
             Long aiGenerationId,
+            Post.Visibility visibility
+    ) {}
+
+    /** Field null nghĩa là giữ nguyên giá trị hiện tại. */
+    public record UpdatePostRequest(
+            @Size(max = 2000) String caption,
+            @Size(max = 100) String filterApplied,
             Post.Visibility visibility
     ) {}
 

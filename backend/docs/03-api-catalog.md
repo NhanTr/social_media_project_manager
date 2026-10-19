@@ -123,8 +123,12 @@ Search result:
 
 | Method | Path | Auth | Input | Kết quả |
 | --- | --- | --- | --- | --- |
-| POST | `/api/v1/media/upload` | User | multipart `file` | `201`, media metadata/URL |
+| POST | `/api/v1/media/upload` | User | multipart `file` | `201`, media metadata/URL (deprecated, giữ cho client cũ) |
+| POST | `/api/v1/media/uploads` | User | `{contentType, declaredSizeBytes?}` | `201`, `{uploadId, presignedUrl, objectKey, expiresInSeconds}` — PUT file thẳng lên `presignedUrl`, hết hạn 10 phút nếu không finalize |
+| POST | `/api/v1/media/uploads/{uploadId}/finalize` | User | — | `200`, media metadata/URL (kiểm tra MIME/size/GIF ≤5s, trả `mediaWidth/mediaHeight`); session sai/chết → `404/403/409`, chưa upload → `400 MEDIA_NOT_UPLOADED` |
 | POST | `/api/v1/posts` | User | `CreatePostRequest` | `201`, post |
+| PUT | `/api/v1/posts/{id}` | User | `{caption?, filterApplied?, visibility?}` (null = giữ nguyên) | Post đã cập nhật; không phải owner → `403` |
+| DELETE | `/api/v1/posts/{id}` | User | — | `204` soft delete (ẩn ngay khỏi feed, lên lịch xóa media); không phải owner → `403` |
 | GET | `/api/v1/posts/{id}` | User | — | Post nếu có quyền xem |
 | GET | `/api/v1/feed?cursor=&limit=20` | User | cursor | Page post bạn bè |
 | GET | `/api/v1/feed/by-friend/{friendId}` | User | cursor | Page post của một friend |

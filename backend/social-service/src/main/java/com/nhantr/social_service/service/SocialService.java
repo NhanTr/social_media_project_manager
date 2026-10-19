@@ -82,7 +82,13 @@ public class SocialService {
         pendingPair(senderId, receiverId).ifPresent(existing -> {
             throw ApiException.conflict("REQUEST_ALREADY_PENDING", "A friend request is already pending.");
         });
-        FriendRequest saved = requestRepository.save(new FriendRequest(senderId, receiverId));
+        FriendRequest saved;
+        try {
+            saved = requestRepository.save(new FriendRequest(senderId, receiverId));
+        } catch (org.springframework.dao.DataIntegrityViolationException duplicatePending) {
+            // Race hai request song song -> unique index uq_friend_requests_pending chặn (V3)
+            throw ApiException.conflict("REQUEST_ALREADY_PENDING", "A friend request is already pending.");
+        }
         notificationClient.friendRequest(receiverId, senderId, saved.getId());
         return RequestResponse.from(saved);
     }
