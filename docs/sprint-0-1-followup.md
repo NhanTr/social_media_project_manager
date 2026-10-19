@@ -27,8 +27,9 @@
 - Chạy toàn stack và kiểm tra luồng end-to-end với hai tài khoản thật.
 - Cấu hình Google OAuth credentials và URL scheme, sau đó kiểm tra đăng nhập Google thực tế.
 - Chốt sáu quyết định boundary/schema còn mở và dependency audit.
-- Push các commit mới, chờ lại required checks của PR #2, xử lý conversation/review còn mở và xác nhận branch protection chặn merge khi CI đỏ.
-- Có người review và thực hiện merge PR sau khi các cổng trên được đối chiếu.
+- Nhờ một người review PR #2; hiện PR chưa có review và không có conversation mở.
+- Bật hoặc thống nhất chính sách branch protection/required checks cho `dev`; API GitHub hiện báo nhánh chưa được bảo vệ.
+- Thực hiện merge PR sau khi các cổng thủ công trên được đối chiếu.
 - Access token hiện tại chưa bị revoke tức thì khi logout; refresh token đã revoke. Đây vẫn là giới hạn được ghi nhận, không được mô tả là đã xử lý.
 
 ## Nghiệm thu gọn
@@ -51,4 +52,5 @@ Rollback: revert commit qua PR; không sửa V3 đã chạy, không drop enum/vo
 - `flutter test`: 10/10 pass; gồm OTP contract, social flags, cancel/double-submit, secure storage/logout, routing và refresh sau consent.
 - `docker compose config --quiet` từ `backend/`: pass (exit 0).
 - `git diff --check`: pass (exit 0).
-- CI remote của PR #2 chưa phản ánh các commit mới vì nhánh chưa được push. Không dùng kết quả CI cũ làm bằng chứng merge-ready.
+- GitHub Actions run `39180565014` trên PR #2 sau commit sửa formatter `3457534`: Backend Build & Unit Tests, Flutter Lint & Unit Tests, Database Migration và Security Scan & Conventions đều pass.
+- PR #2 được GitHub đánh giá `CLEAN` và `MERGEABLE`, không có review conversation mở. Trạng thái này không thay thế người review, kiểm tra thiết bị/OAuth/full-stack hoặc quyết định merge của người phụ trách.
