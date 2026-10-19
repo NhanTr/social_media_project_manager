@@ -26,6 +26,7 @@ app:
   otp:
     expiration-minutes: 5
     expose-code: ${OTP_EXPOSE_CODE:true}
+    resend-limit-per-minute: ${OTP_RESEND_LIMIT_PER_MINUTE:5}
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
   seed:

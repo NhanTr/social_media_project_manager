@@ -94,7 +94,7 @@ class AuthController extends ChangeNotifier {
 
       if (res.success && res.data is Map<String, dynamic>) {
         final data = res.data as Map<String, dynamic>;
-        _lastOtpMock = data['otpCode']?.toString();
+        _lastOtpMock = (data['devOtp'] ?? data['otpCode'])?.toString();
         _isLoading = false;
         notifyListeners();
         return true;
@@ -120,7 +120,7 @@ class AuthController extends ChangeNotifier {
     try {
       final res = await _api.post('/api/v1/auth/phone/verify-otp', body: {
         'phoneNumber': phoneNumber.trim(),
-        'otpCode': otpCode.trim(),
+        'otp': otpCode.trim(),
       });
 
       if (res.success && res.data is Map<String, dynamic>) {

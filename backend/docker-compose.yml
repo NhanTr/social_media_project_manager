@@ -50,7 +50,7 @@ services:
     networks: [loccoc]
 
   minio:
-    image: minio/minio:latest
+    image: elestio/minio:latest
     platform: linux/amd64
     container_name: loccoc-minio
     restart: unless-stopped

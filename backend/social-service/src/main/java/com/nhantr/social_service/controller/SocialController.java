@@ -67,6 +67,11 @@ public class SocialController {
         return service.decline(user.id(), id);
     }
 
+    @DeleteMapping("/api/v1/friend-requests/{id}")
+    public SocialService.RequestResponse cancel(@AuthenticationPrincipal CurrentUser user, @PathVariable Long id) {
+        return service.cancel(user.id(), id);
+    }
+
     @PostMapping("/api/v1/blocks/{userId}")
     @ResponseStatus(HttpStatus.CREATED)
     public SocialService.BlockResponse block(@AuthenticationPrincipal CurrentUser user, @PathVariable Long userId) {

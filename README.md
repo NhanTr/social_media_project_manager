@@ -9,8 +9,10 @@ Chat, Notification, Subscription, and Admin.
 - `main`: stable integration baseline.
 - `dev`: integration branch for sprint work.
 - `mobile-app`: initial Flutter application generated for Android and iOS.
-- Backend source has not been found in this repository yet. Do not mark backend
-  work complete until its source and Git history are verified.
+- `backend/`: Spring Boot microservices backend — API Gateway plus identity,
+  social, post, notification, chat, ai and moderation services on PostgreSQL,
+  Redis and MinIO. See [`backend/README.md`](backend/README.md) for the service
+  table, ports, run instructions and API overview.
 
 The detailed implementation plan is in
 [`LocCoc_Project_Plan_3_Members.md`](LocCoc_Project_Plan_3_Members.md). The

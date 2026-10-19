@@ -1,5 +1,6 @@
 package com.nhantr.identity_service.service;
 
+import com.nhantr.common.api.ApiException;
 import com.nhantr.identity_service.dto.request.*;
 import com.nhantr.identity_service.dto.response.*;
 import com.nhantr.identity_service.entity.User;
@@ -33,6 +34,7 @@ public class AuthService {
     private final boolean exposeOtpCode;
     private final GoogleTokenVerifier googleTokenVerifier;
     private final TermsService termsService;
+    private final long resendLimitPerMinute;
 
     public AuthService(
             UserRepository userRepository,
@@ -41,7 +43,8 @@ public class AuthService {
             @Value("${app.otp.expiration-minutes}") long otpExpirationMinutes,
             @Value("${app.otp.expose-code:false}") boolean exposeOtpCode,
             GoogleTokenVerifier googleTokenVerifier,
-            TermsService termsService
+            TermsService termsService,
+            @Value("${app.otp.resend-limit-per-minute:5}") long resendLimitPerMinute
     ) {
         this.userRepository = userRepository;
         this.redisTemplate = redisTemplate;
@@ -50,10 +53,12 @@ public class AuthService {
         this.exposeOtpCode = exposeOtpCode;
         this.googleTokenVerifier = googleTokenVerifier;
         this.termsService = termsService;
+        this.resendLimitPerMinute = resendLimitPerMinute;
     }
 
     public OtpResponse requestPhoneOtp(PhoneOtpRequest request) {
         String phoneNumber = normalizePhoneNumber(request.phoneNumber());
+        enforceResendLimit(phoneNumber);
         String otp = String.format(Locale.ROOT, "%06d", SECURE_RANDOM.nextInt(1_000_000));
 
         redisTemplate.opsForValue().set(otpKey(phoneNumber), otp, Duration.ofMinutes(otpExpirationMinutes));
@@ -63,6 +68,23 @@ public class AuthService {
                 otpExpirationMinutes * 60,
                 exposeOtpCode ? otp : null
         );
+    }
+
+    private void enforceResendLimit(String phoneNumber) {
+        String rateKey = otpRateKey(phoneNumber);
+        Long attempts = redisTemplate.opsForValue().increment(rateKey);
+        if (attempts == null) {
+            return;
+        }
+        if (attempts == 1L) {
+            redisTemplate.expire(rateKey, Duration.ofMinutes(1));
+        }
+        if (attempts > resendLimitPerMinute) {
+            throw ApiException.tooManyRequests(
+                    "OTP_RATE_LIMITED",
+                    "Too many OTP requests for this phone number. Please wait and try again."
+            );
+        }
     }
 
     @Transactional
@@ -284,6 +306,10 @@ public class AuthService {
 
     private String otpKey(String phoneNumber) {
         return "identity:otp:phone:" + phoneNumber;
+    }
+
+    private String otpRateKey(String phoneNumber) {
+        return "identity:otp:rate:" + phoneNumber;
     }
 
     private String refreshTokenKey(Long userId, String tokenId) {

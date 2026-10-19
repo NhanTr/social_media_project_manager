@@ -28,6 +28,7 @@ public class SecurityConfig {
                 new BearerTokenFilter(jwt, internalApiKey),
                 "/api/v1/auth/**",
                 "/api/v1/terms/latest",
+                "/api/v1/admin/auth/login",
                 "/ws/chat/**"
         );
     }

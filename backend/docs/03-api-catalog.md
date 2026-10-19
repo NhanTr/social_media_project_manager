@@ -98,6 +98,7 @@ Ràng buộc đáng chú ý:
 | GET | `/api/v1/friend-requests/outgoing` | User | — | Request đã gửi |
 | POST | `/api/v1/friend-requests/{id}/accept` | User | — | Friendship |
 | POST | `/api/v1/friend-requests/{id}/decline` | User | — | Request trạng thái `DECLINED` |
+| DELETE | `/api/v1/friend-requests/{id}` | User | — | `200`, request `CANCELLED` (chỉ sender hủy request `PENDING`; không còn hàng → `404`) |
 | POST | `/api/v1/blocks/{userId}` | User | — | `201`, block |
 | DELETE | `/api/v1/blocks/{userId}` | User | — | `204` |
 | GET | `/api/v1/blocks` | User | — | Danh sách block |

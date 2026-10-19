@@ -10,6 +10,7 @@
 
 - [x] Chuyển kế hoạch từ `LocCoc_Project_Plan_3_Members.docx` sang Markdown để tiếp tục làm việc về sau.
 - [ ] Bắt đầu triển khai dự án.
+- 16/10/2026: Chạy xác minh toàn stack local thành công (11 container healthy, Flyway migrate từ DB rỗng, smoke test auth → terms → kết bạn → post → feed → chat → notification). Bổ sung: `DELETE /api/v1/friend-requests/{id}` (cancel, LC-S1-03 còn thiếu), OTP resend limit 5/phút (LC-S1-01 còn thiếu), public path `admin/auth/login` ở Gateway, sửa README gốc. Thêm 7 unit test (cancel, OTP rate limit). Chưa tick task Sprint 0–1 vì tiêu chí nghiệm thu còn thiếu: publish tag/required checks lên GitHub, integration test, demo Flutter emulator.
 
 ## Việc cần làm tiếp theo
 
