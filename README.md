@@ -50,6 +50,20 @@ Cần xác nhận trên Android/iOS thật hoặc simulator; unit test dùng sto
 - Chỉ merge vào main và chuyển Done khi CI cùng acceptance criteria đạt.
 - Không force push hoặc xóa volume dữ liệu để chạy nghiệm thu.
 
+CI bắt buộc kiểm tra Conventional Commit, các mẫu environment, Flutter format,
+analyze, test và debug APK, Maven Checkstyle/test/build, migration Flyway, secret
+scan và dependency scan mức `HIGH`/`CRITICAL`. Chạy các gate chính trước khi push:
+
+```sh
+python3 -m unittest discover -s scripts/tests -v
+python3 scripts/check_conventional_commits.py origin/dev HEAD
+python3 scripts/validate_environment_config.py \
+  backend/.env.example backend/.env.staging.example backend/.env.prod.example
+(cd backend && mvn -B -DskipTests checkstyle:check && mvn -B clean verify)
+(cd loccoc_application && flutter analyze && flutter test --timeout 30s \
+  && flutter build apk --debug --dart-define=APP_ENV=dev)
+```
+
 Xem [hướng dẫn nghiệm thu](docs/sprint-0-1-acceptance-review.md) và
 [báo cáo bổ sung](docs/sprint-0-1-followup.md). Các kết quả kiểm tra có thời điểm;
 không diễn giải inventory cũ là xác nhận trạng thái hiện tại.

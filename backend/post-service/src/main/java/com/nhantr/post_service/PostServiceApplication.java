@@ -6,8 +6,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication(scanBasePackages = {"com.nhantr.post_service", "com.nhantr.common"})
 public class PostServiceApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(PostServiceApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(PostServiceApplication.class, args);
+    }
 
 }

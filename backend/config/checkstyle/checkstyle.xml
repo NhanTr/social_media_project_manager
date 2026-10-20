@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+        "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+
+    <module name="FileTabCharacter"/>
+    <module name="TreeWalker">
+        <module name="AvoidStarImport">
+            <property name="excludes"
+                      value="com.nhantr.identity_service.dto.request,
+                             com.nhantr.identity_service.dto.response,
+                             com.nhantr.social_service.repository,
+                             io.minio,
+                             jakarta.persistence,
+                             jakarta.validation.constraints,
+                             java.util,
+                             org.springframework.web.bind.annotation,
+                             org.assertj.core.api.Assertions,
+                             org.mockito.Mockito"/>
+        </module>
+        <module name="EmptyStatement"/>
+        <module name="RegexpSinglelineJava">
+            <property name="format" value="\s+$"/>
+            <property name="message" value="Trailing whitespace is not allowed."/>
+        </module>
+    </module>
+</module>
