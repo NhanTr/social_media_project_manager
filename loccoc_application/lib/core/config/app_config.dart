@@ -2,6 +2,8 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+import 'environment_config.dart';
+
 class AppConfig {
   static const googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
@@ -30,7 +32,11 @@ class AppConfig {
     return 'http://localhost:8080';
   }
 
-  static String baseUrl = _configuredBaseUrl.isNotEmpty
-      ? _configuredBaseUrl
-      : defaultBaseUrl;
+  static final EnvironmentConfig parsedEnvironment = EnvironmentConfig.parse(
+    environment: environment,
+    apiBaseUrl: _configuredBaseUrl,
+    devDefaultBaseUrl: defaultBaseUrl,
+  );
+
+  static String baseUrl = parsedEnvironment.apiBaseUrl.toString();
 }
