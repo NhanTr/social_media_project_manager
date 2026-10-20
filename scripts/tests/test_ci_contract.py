@@ -74,7 +74,7 @@ class ContinuousIntegrationContractTests(unittest.TestCase):
         trivy_steps = [
             step
             for step in self.steps
-            if step.get("uses") == "aquasecurity/trivy-action@0.29.0"
+            if step.get("uses") == "aquasecurity/trivy-action@v0.29.0"
         ]
         self.assertEqual(len(trivy_steps), 1)
         configuration = trivy_steps[0].get("with", {})
