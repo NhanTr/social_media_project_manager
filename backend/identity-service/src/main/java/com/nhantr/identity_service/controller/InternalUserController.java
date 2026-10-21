@@ -3,7 +3,6 @@ package com.nhantr.identity_service.controller;
 import com.nhantr.identity_service.dto.response.UserResponse;
 import com.nhantr.identity_service.enums.UserStatus;
 import com.nhantr.identity_service.repository.UserRepository;
-import com.nhantr.identity_service.enums.UserStatus;
 import com.nhantr.identity_service.service.UserService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -26,8 +25,7 @@ public class InternalUserController {
 
     @GetMapping("/search")
     public List<UserResponse> search(@RequestParam @Size(min = 1, max = 100) String keyword) {
-        return repository.search(keyword.trim(), UserStatus.ACTIVE)
-                .stream().limit(25).map(UserResponse::from).toList();
+        return service.search(keyword);
     }
 
     @PostMapping("/batch")

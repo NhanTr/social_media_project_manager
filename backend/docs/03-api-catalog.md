@@ -120,6 +120,11 @@ Ràng buộc đáng chú ý:
 | DELETE | `/api/v1/blocks/{userId}` | User | — | `204` |
 | GET | `/api/v1/blocks` | User | — | Danh sách block |
 
+Quy tắc search: username/display name hỗ trợ tìm kiếm một phần. Số điện thoại chỉ
+đối sánh chính xác sau khi chuẩn hóa (`090...`, `84...`, `+84...`) và băm SHA-256;
+chuỗi số điện thoại chưa đầy đủ trả về danh sách rỗng, không chạy `LIKE` trên
+`phone_number`. `phone_lookup_hash` là dữ liệu nội bộ và không xuất hiện trong DTO.
+
 Search result:
 
 ```json
@@ -268,7 +273,7 @@ Tất cả endpoint dưới đây yêu cầu `X-Internal-Api-Key` và không đi
 
 | Method | Path | Caller |
 | --- | --- | --- |
-| GET | `/internal/v1/users/search?keyword=` | social |
+| GET | `/internal/v1/users/search?keyword=` | social; text partial hoặc phone chính xác qua hash |
 | POST | `/internal/v1/users/batch` body `{ids}` | social, post, moderation |
 | POST | `/internal/v1/users/{id}/status` body `{status}` | moderation |
 
