@@ -4,6 +4,20 @@ Monorepo: Flutter trong `loccoc_application/`, Java 21/Maven backend trong `back
 Gateway cổng 8080; identity 8081, social 8082, post 8083, notification 8084,
 chat 8085, AI 8086 và moderation 8087. Subscription vẫn nằm trong kế hoạch Sprint 4.
 
+## Ranh giới MVP đã chốt
+
+- MVP chấp nhận schema `public` dùng chung với ownership/grants.
+- Schema riêng theo service được hoãn sang sprint hậu MVP.
+- Mock/demo không production-ready.
+- Adapter production AI, payment, email và push được hoãn sang Icebox.
+
+Đây là quyết định phạm vi cho MVP/demo, không phải xác nhận hai hạng mục trên đã
+hoàn thành. Trước production cần tách schema/credential theo service, diễn tập
+migration và backup/restore, đồng thời thay mock bằng adapter có secret
+management, idempotency, observability và failure policy. Chi tiết ở
+[kiến trúc MVP](docs/architecture/01-mvp-boundaries-and-architecture.md) và
+[roadmap backend](backend/docs/05-gaps-and-roadmap.md).
+
 ## Chạy local
 
 ```sh
