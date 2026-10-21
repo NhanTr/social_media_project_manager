@@ -9,6 +9,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import com.nhantr.identity_service.enums.UserStatus;
+
 public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByUsername(String username);
@@ -16,6 +18,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
 
     Optional<User> findByPhoneNumber(String phoneNumber);
+
+    Optional<User> findByPhoneLookupHashAndStatus(String phoneLookupHash, UserStatus status);
+
+    Optional<User> findByPhoneLookupHash(String phoneLookupHash);
 
     Optional<User> findByGoogleId(String googleId);
 
@@ -38,10 +44,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
             where u.status = :status
               and (
                 lower(u.username) like lower(concat('%', :keyword, '%'))
-                or u.phoneNumber like concat('%', :keyword, '%')
                 or lower(coalesce(u.displayName, '')) like lower(concat('%', :keyword, '%'))
               )
             order by u.username
             """)
-    List<User> search(@Param("keyword") String keyword, @Param("status") com.nhantr.identity_service.enums.UserStatus status);
+    List<User> searchByUsernameOrDisplayName(
+            @Param("keyword") String keyword,
+            @Param("status") UserStatus status
+    );
 }

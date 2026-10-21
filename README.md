@@ -4,6 +4,20 @@ Monorepo: Flutter trong `loccoc_application/`, Java 21/Maven backend trong `back
 Gateway cổng 8080; identity 8081, social 8082, post 8083, notification 8084,
 chat 8085, AI 8086 và moderation 8087. Subscription vẫn nằm trong kế hoạch Sprint 4.
 
+## Ranh giới MVP đã chốt
+
+- MVP chấp nhận schema `public` dùng chung với ownership/grants.
+- Schema riêng theo service được hoãn sang sprint hậu MVP.
+- Mock/demo không production-ready.
+- Adapter production AI, payment, email và push được hoãn sang Icebox.
+
+Đây là quyết định phạm vi cho MVP/demo, không phải xác nhận hai hạng mục trên đã
+hoàn thành. Trước production cần tách schema/credential theo service, diễn tập
+migration và backup/restore, đồng thời thay mock bằng adapter có secret
+management, idempotency, observability và failure policy. Chi tiết ở
+[kiến trúc MVP](docs/architecture/01-mvp-boundaries-and-architecture.md) và
+[roadmap backend](backend/docs/05-gaps-and-roadmap.md).
+
 ## Chạy local
 
 ```sh
@@ -49,6 +63,20 @@ Cần xác nhận trên Android/iOS thật hoặc simulator; unit test dùng sto
 - PR vào dev, gắn card, test evidence và rollback note; có người khác review.
 - Chỉ merge vào main và chuyển Done khi CI cùng acceptance criteria đạt.
 - Không force push hoặc xóa volume dữ liệu để chạy nghiệm thu.
+
+CI bắt buộc kiểm tra Conventional Commit, các mẫu environment, Flutter format,
+analyze, test và debug APK, Maven Checkstyle/test/build, migration Flyway, secret
+scan và dependency scan mức `HIGH`/`CRITICAL`. Chạy các gate chính trước khi push:
+
+```sh
+python3 -m unittest discover -s scripts/tests -v
+python3 scripts/check_conventional_commits.py origin/dev HEAD
+python3 scripts/validate_environment_config.py \
+  backend/.env.example backend/.env.staging.example backend/.env.prod.example
+(cd backend && mvn -B -DskipTests checkstyle:check && mvn -B clean verify)
+(cd loccoc_application && flutter analyze && flutter test --timeout 30s \
+  && flutter build apk --debug --dart-define=APP_ENV=dev)
+```
 
 Xem [hướng dẫn nghiệm thu](docs/sprint-0-1-acceptance-review.md) và
 [báo cáo bổ sung](docs/sprint-0-1-followup.md). Các kết quả kiểm tra có thời điểm;

@@ -49,6 +49,10 @@ jobs:
           cd loccoc_application
           flutter test --coverage --timeout 30s
 
+      - name: Build Flutter debug APK
+        working-directory: loccoc_application
+        run: flutter build apk --debug --dart-define=APP_ENV=dev
+
       - name: Upload Flutter coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -72,10 +76,13 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Run Java source lint
+        working-directory: backend
+        run: mvn -B -DskipTests checkstyle:check
+
       - name: Run Maven build and tests
-        run: |
-          cd backend
-          mvn -B clean verify
+        working-directory: backend
+        run: mvn -B clean verify
 
       - name: Upload backend test reports
         if: always()
@@ -118,11 +125,42 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run repository policy tests
+        run: python3 -m unittest discover -s scripts/tests -v
+
+      - name: Validate environment samples
+        run: |
+          python3 scripts/validate_environment_config.py \
+            backend/.env.example \
+            backend/.env.staging.example \
+            backend/.env.prod.example
+
+      - name: Check conventional commit subjects
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            range="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            range="${{ github.event.before }}..${{ github.sha }}"
+          fi
+          python3 scripts/check_conventional_commits.py "${range%%..*}" "${range##*..}"
 
       - name: Check for committed secrets
         run: |
           echo "Scanning for accidental hardcoded secrets..."
           ! grep -rnE --exclude-dir={.git,target,.dart_tool} "BEGIN (RSA|EC|DSA|OPENSSH) PRIVATE KEY" .
+
+      - name: Scan dependencies for high or critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
 
       - name: Check conventional PR title
         if: github.event_name == 'pull_request'

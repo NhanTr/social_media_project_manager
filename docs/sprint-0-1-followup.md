@@ -1,4 +1,17 @@
-# Bổ sung Sprint 0–1 — cập nhật 19/10/2026
+# Bổ sung Sprint 0–1 — cập nhật 21/10/2026
+
+## Quyết định close-out MVP
+
+- MVP chấp nhận schema `public` dùng chung với ownership/grants.
+- Schema riêng theo service được hoãn sang sprint hậu MVP.
+- Mock/demo không production-ready.
+- Adapter production AI, payment, email và push được hoãn sang Icebox.
+
+Hiện trạng được chấp nhận chỉ cho MVP/demo: một PostgreSQL cluster, Flyway dùng
+chung và quyền bảng theo service owner. Đích hậu MVP là schema/credential riêng,
+kiểm thử migration và restore theo service. AI hiện là luồng mock; payment và
+email chưa có adapter production; push chưa kết nối FCM/APNs production. Các
+mục này vẫn để chưa hoàn thành trên Trello và cần task/sprint riêng.
 
 ## Phần thực hiện
 
@@ -20,13 +33,17 @@
 | `5b9c2f9` | Refresh phiên sau consent trên Flutter | Widget/controller test xác minh refresh thành công mới rời Terms; refresh lỗi vẫn retry được. |
 | `f4c368b` | Audit đăng nhập đã redaction | 8 audit tests xác minh event thành công/thất bại và không lộ credential/PII. |
 | `a5144eb` | Tuần tự hóa block với accept | Unit test lock/idempotency và integration test PostgreSQL 16 với hai transaction đồng thời. |
+| `6d74a6d` | Environment dev/staging/prod | Dart config tests, Python sample validator, analyzer và Flutter tests đạt. |
+| `ecb5ff9`–`37f1175` | CI quality gates | Conventional commit, Checkstyle, Flutter APK, migration và Trivy HIGH/CRITICAL; CI run `39467303520` xanh. |
+| `b8c2897` | Loading/error/retry dùng chung | 23 Flutter tests; mutation không tự replay và session expiry vẫn về login. |
+| `85ad719` | Search phone hash chính xác | 17 identity tests; PostgreSQL 16 migrate/validate V4 và backfill canonical SHA-256 đạt. |
 
 ## Phần vẫn chờ
 
 - Demo Android và iOS trên thiết bị/emulator.
 - Chạy toàn stack và kiểm tra luồng end-to-end với hai tài khoản thật.
 - Cấu hình Google OAuth credentials và URL scheme, sau đó kiểm tra đăng nhập Google thực tế.
-- Chốt sáu quyết định boundary/schema còn mở và dependency audit.
+- Lập kế hoạch hậu MVP cho schema-per-service và adapter production đã hoãn.
 - Nhờ một người review PR #2; hiện PR chưa có review và không có conversation mở.
 - Bật hoặc thống nhất chính sách branch protection/required checks cho `dev`; API GitHub hiện báo nhánh chưa được bảo vệ.
 - Thực hiện merge PR sau khi các cổng thủ công trên được đối chiếu.
@@ -34,7 +51,7 @@
 
 ## Nghiệm thu gọn
 
-1. Chạy migration V3, mở app và dùng hai tài khoản OTP.
+1. Chạy migration V4, mở app và dùng hai tài khoản OTP.
 2. Consent → profile → tìm bạn → gửi → hủy; B không còn incoming.
 3. Gửi lại → accept; tìm lại phải hiển thị đã là bạn. Block/unblock và kiểm tra danh sách.
 4. Double tap một action; không gửi hai mutation. Tắt mạng, thử lại và kiểm tra UI báo lỗi.
@@ -43,14 +60,17 @@
 7. Cho accept và block chạy gần đồng thời; trạng thái cuối phải blocked, không friendship, không pending request.
 8. Xem CI trên PR. Chỉ tick mục nghiệm thu đã có bằng chứng.
 
-Rollback: revert commit qua PR; không sửa V3 đã chạy, không drop enum/volume. Enum CANCELLED có thể giữ khi rollback code; kiểm tra dữ liệu trước khi rollback service cũ.
+Rollback: revert code qua PR; không sửa V3/V4 đã chạy và không drop enum, cột
+hash hoặc volume. Enum `CANCELLED` và `phone_lookup_hash` có thể giữ khi rollback
+service; kiểm tra dữ liệu và compatibility trước khi quay về bản cũ.
 
 ## Kiểm tra local đã chạy
 
-- `mvn test` từ `backend/`: BUILD SUCCESS, 10/10 module SUCCESS, tổng 32 test, 0 failure, 0 error, 0 skipped. Bao gồm PostgreSQL 16 Testcontainers cho race block/accept.
-- `flutter analyze`: không có issue.
-- `flutter test`: 10/10 pass; gồm OTP contract, social flags, cancel/double-submit, secure storage/logout, routing và refresh sau consent.
-- `docker compose config --quiet` từ `backend/`: pass (exit 0).
-- `git diff --check`: pass (exit 0).
-- GitHub Actions run `39180565014` trên PR #2 sau commit sửa formatter `3457534`: Backend Build & Unit Tests, Flutter Lint & Unit Tests, Database Migration và Security Scan & Conventions đều pass.
-- PR #2 được GitHub đánh giá `CLEAN` và `MERGEABLE`, không có review conversation mở. Trạng thái này không thay thế người review, kiểm tra thiết bị/OAuth/full-stack hoặc quyết định merge của người phụ trách.
+- `python3 -m unittest discover -s scripts/tests -v`: 16/16 pass, gồm environment, conventional commit, CI contract và đồng bộ tài liệu close-out.
+- `mvn -B clean verify` từ `backend/`: BUILD SUCCESS, 10/10 module SUCCESS, 38 test, 0 failure, 0 error, 0 skipped; `mvn -B -DskipTests checkstyle:check` có 0 violation.
+- PostgreSQL 16.14: Flyway migrate V1–V4 và validate thành công; ba fixture dạng `090...`, `84...`, `+84...` có hash 64 ký tự khớp canonical SHA-256.
+- `flutter analyze`: không có issue; `flutter test --coverage`: 23/23 pass, line coverage 489/1220 (40,1%).
+- Debug APK build thành công tại `loccoc_application/build/app/outputs/flutter-apk/app-debug.apk` (177 MB tại thời điểm kiểm tra).
+- `docker compose config --quiet` và `git diff --check`: pass (exit 0).
+- GitHub Actions run `39526673095` trên PR #3 tại commit `85ad719`: Backend, Flutter, Database Migration và Security Scan & Conventions đều pass, gồm migration V4 và Trivy HIGH/CRITICAL.
+- PR #3 vẫn là Draft và chưa merge. Trạng thái tự động không thay thế reviewer, tester, kiểm tra thiết bị/OAuth/full-stack hoặc quyết định merge của người phụ trách.

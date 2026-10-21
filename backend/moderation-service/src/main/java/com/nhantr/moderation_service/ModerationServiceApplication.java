@@ -6,8 +6,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication(scanBasePackages = {"com.nhantr.moderation_service", "com.nhantr.common"})
 public class ModerationServiceApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(ModerationServiceApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(ModerationServiceApplication.class, args);
+    }
 
 }

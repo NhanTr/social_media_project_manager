@@ -14,6 +14,7 @@ import com.nhantr.identity_service.repository.UserRepository;
 import com.nhantr.identity_service.repository.UserTermsAcceptanceRepository;
 import com.nhantr.identity_service.security.GoogleTokenVerifier;
 import com.nhantr.identity_service.security.JwtService;
+import com.nhantr.identity_service.security.PhoneLookupHasher;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -57,7 +59,17 @@ class AuthServiceAuditTests {
         terms = mock(TermsService.class);
         audit = mock(AuthAuditLogger.class);
         when(redis.opsForValue()).thenReturn(values);
-        auth = new AuthService(users, redis, jwt, 5, false, google, terms, audit);
+        auth = new AuthService(
+                users,
+                redis,
+                jwt,
+                5,
+                false,
+                google,
+                terms,
+                audit,
+                new PhoneLookupHasher()
+        );
     }
 
     @Test
@@ -92,11 +104,13 @@ class AuthServiceAuditTests {
                 anyString(),
                 anyString()
         )).thenReturn(1L, 0L, -1L);
-        when(users.findByPhoneNumber(anyString())).thenReturn(Optional.of(user));
+        when(users.findByPhoneLookupHash(anyString())).thenReturn(Optional.of(user));
         when(users.save(user)).thenReturn(user);
         stubAuthResponse(user);
 
         auth.verifyPhoneOtp(new VerifyPhoneOtpRequest("+84900000001", "654321", null));
+        assertThat(user.getPhoneLookupHash()).hasSize(64);
+        verify(users).findByPhoneLookupHash(user.getPhoneLookupHash());
         assertThatThrownBy(() -> auth.verifyPhoneOtp(
                 new VerifyPhoneOtpRequest("+84900000001", "111111", null)
         )).isInstanceOf(ApiException.class);

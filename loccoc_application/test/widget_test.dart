@@ -56,6 +56,39 @@ void main() {
     expect(find.byType(LoginScreen), findsOneWidget);
   });
 
+  test(
+    'expired session clears storage and remains a login transition',
+    () async {
+      final storage = SessionStorage();
+      await storage.saveSession(
+        accessToken: 'expired-access',
+        refreshToken: 'expired-refresh',
+        userId: 1,
+        username: 'tester',
+        displayName: 'Tester',
+        requiresTerms: false,
+      );
+      final authController = AuthController(
+        storage: storage,
+        api: ApiClient(
+          storage: storage,
+          client: MockClient((request) async {
+            if (request.url.path == '/actuator/health') {
+              return http.Response('{}', 200);
+            }
+            return http.Response('{"detail":"expired"}', 401);
+          }),
+        ),
+      );
+
+      await authController.bootstrap();
+
+      expect(authController.status, AuthStatus.unauthenticated);
+      expect(await storage.getAccessToken(), isNull);
+      expect(await storage.getRefreshToken(), isNull);
+    },
+  );
+
   testWidgets('failed post-consent refresh keeps the retryable Terms screen', (
     WidgetTester tester,
   ) async {

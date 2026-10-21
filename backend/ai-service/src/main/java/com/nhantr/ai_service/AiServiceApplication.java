@@ -7,8 +7,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @org.springframework.scheduling.annotation.EnableScheduling
 public class AiServiceApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(AiServiceApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(AiServiceApplication.class, args);
+    }
 
 }

@@ -34,6 +34,9 @@ public class User {
     @Column(name = "phone_number", unique = true, length = 30)
     private String phoneNumber;
 
+    @Column(name = "phone_lookup_hash", length = 64)
+    private String phoneLookupHash;
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "auth_provider", nullable = false, columnDefinition = "auth_provider")
@@ -107,6 +110,14 @@ public class User {
 
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
+    }
+
+    public String getPhoneLookupHash() {
+        return phoneLookupHash;
+    }
+
+    public void setPhoneLookupHash(String phoneLookupHash) {
+        this.phoneLookupHash = phoneLookupHash;
     }
 
     public AuthProvider getAuthProvider() {

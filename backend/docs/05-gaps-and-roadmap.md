@@ -2,6 +2,19 @@
 
 Tài liệu Notion mô tả MVP 20 use case. Source hiện tại đã có phần lõi, nhưng “tracker 100%” nên được hiểu là hoàn thành phạm vi mock/demo, chưa phải production-ready.
 
+## 0. Quyết định phạm vi MVP đã chốt (21/10/2026)
+
+- MVP chấp nhận schema `public` dùng chung với ownership/grants.
+- Schema riêng theo service được hoãn sang sprint hậu MVP.
+- Mock/demo không production-ready.
+- Adapter production AI, payment, email và push được hoãn sang Icebox.
+
+Điểm đến hậu MVP là schema và credential riêng theo service, có migration,
+rollback và backup/restore được diễn tập. Adapter production phải bổ sung quản
+lý secret, timeout/retry có idempotency, observability, quota và failure policy.
+Cho đến khi các điều kiện đó đạt, AI mock và các tích hợp payment/email/push
+không được dùng làm bằng chứng production readiness.
+
 ## 1. Sai khác cần thống nhất ngay
 
 | Chủ đề | Thiết kế/README cũ | Code hiện tại | Khuyến nghị |
@@ -120,6 +133,8 @@ Kafka chưa bắt buộc cho MVP; transactional outbox + worker REST đã đủ 
 - Push: FCM/APNs, token invalidation và delivery metrics.
 - AI: provider/model, queue, quota, cost cap và safety moderation.
 - Media: virus/type validation, thumbnail/transcode, signed/private access.
+- Payment/email: chưa có adapter production hoặc operational runbook; giữ Icebox
+  cho đến khi product scope và provider contract được duyệt.
 
 ## 5. Ưu tiên triển khai
 

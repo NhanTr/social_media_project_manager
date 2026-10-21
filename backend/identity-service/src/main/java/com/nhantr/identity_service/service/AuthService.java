@@ -12,6 +12,7 @@ import com.nhantr.identity_service.enums.UserStatus;
 import com.nhantr.identity_service.repository.UserRepository;
 import com.nhantr.identity_service.security.GoogleTokenVerifier;
 import com.nhantr.identity_service.security.JwtService;
+import com.nhantr.identity_service.security.PhoneLookupHasher;
 import io.jsonwebtoken.Claims;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -48,6 +49,7 @@ public class AuthService {
     private final GoogleTokenVerifier googleTokenVerifier;
     private final TermsService termsService;
     private final AuthAuditLogger auditLogger;
+    private final PhoneLookupHasher phoneLookupHasher;
 
     public AuthService(
             UserRepository userRepository,
@@ -57,7 +59,8 @@ public class AuthService {
             @Value("${app.otp.expose-code:false}") boolean exposeOtpCode,
             GoogleTokenVerifier googleTokenVerifier,
             TermsService termsService,
-            AuthAuditLogger auditLogger
+            AuthAuditLogger auditLogger,
+            PhoneLookupHasher phoneLookupHasher
     ) {
         this.userRepository = userRepository;
         this.redisTemplate = redisTemplate;
@@ -67,6 +70,7 @@ public class AuthService {
         this.googleTokenVerifier = googleTokenVerifier;
         this.termsService = termsService;
         this.auditLogger = auditLogger;
+        this.phoneLookupHasher = phoneLookupHasher;
     }
 
     public OtpResponse requestPhoneOtp(PhoneOtpRequest request) {
@@ -104,8 +108,10 @@ public class AuthService {
             throw ApiException.badRequest("OTP_INVALID", "OTP is invalid or expired.");
         }
 
-        User user = userRepository.findByPhoneNumber(phoneNumber)
+        String phoneLookupHash = phoneLookupHasher.hash(phoneNumber);
+        User user = userRepository.findByPhoneLookupHash(phoneLookupHash)
                 .orElseGet(() -> createPhoneUser(phoneNumber, request.displayName()));
+        user.setPhoneLookupHash(phoneLookupHash);
         user.setLastLoginAt(Instant.now());
         User savedUser = userRepository.save(user);
 
@@ -283,6 +289,7 @@ public class AuthService {
     private User createPhoneUser(String phoneNumber, String displayName) {
         User user = new User();
         user.setPhoneNumber(phoneNumber);
+        user.setPhoneLookupHash(phoneLookupHasher.hash(phoneNumber));
         user.setAuthProvider(AuthProvider.PHONE);
         user.setUsername(generateUsername(phoneNumber));
         user.setDisplayName(resolveDisplayName(displayName, phoneNumber));
@@ -323,13 +330,7 @@ public class AuthService {
     }
 
     private String normalizePhoneNumber(String phoneNumber) {
-        String normalized = requireText(phoneNumber, "phoneNumber").replaceAll("\\s+", "");
-
-        if (!normalized.matches("^\\+?[0-9]{8,15}$")) {
-            throw new IllegalArgumentException("phoneNumber must contain 8 to 15 digits.");
-        }
-
-        return normalized;
+        return phoneLookupHasher.normalize(phoneNumber);
     }
 
     private String requireText(String value, String fieldName) {

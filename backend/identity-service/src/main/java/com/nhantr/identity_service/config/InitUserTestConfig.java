@@ -4,6 +4,7 @@ import com.nhantr.identity_service.entity.User;
 import com.nhantr.identity_service.enums.AuthProvider;
 import com.nhantr.identity_service.enums.UserStatus;
 import com.nhantr.identity_service.repository.UserRepository;
+import com.nhantr.identity_service.security.PhoneLookupHasher;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -18,7 +19,10 @@ import org.springframework.context.annotation.Configuration;
 public class InitUserTestConfig {
 
     @Bean
-    ApplicationRunner initTestUser(UserRepository userRepository) {
+    ApplicationRunner initTestUser(
+            UserRepository userRepository,
+            PhoneLookupHasher phoneLookupHasher
+    ) {
         return args -> {
             String phoneNumber = "+84900000000";
 
@@ -29,6 +33,7 @@ public class InitUserTestConfig {
             User user = new User();
             user.setUsername("test_user");
             user.setPhoneNumber(phoneNumber);
+            user.setPhoneLookupHash(phoneLookupHasher.hash(phoneNumber));
             user.setAuthProvider(AuthProvider.PHONE);
             user.setDisplayName("Test User");
             user.setStatus(UserStatus.ACTIVE);

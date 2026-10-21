@@ -19,6 +19,7 @@ class FriendsController extends ChangeNotifier {
   Future<bool> _mutate(String key, Future<bool> Function() action) async {
     if (!_pendingActions.add(key)) return false;
     _errorMessage = null;
+    _canRetryRead = false;
     notifyListeners();
     try {
       final result = await action();
@@ -37,6 +38,7 @@ class FriendsController extends ChangeNotifier {
   bool _isLoading = false;
   bool _isSearching = false;
   String? _errorMessage;
+  bool _canRetryRead = false;
 
   FriendsController({required this.api});
 
@@ -48,10 +50,12 @@ class FriendsController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isSearching => _isSearching;
   String? get errorMessage => _errorMessage;
+  bool get canRetryRead => _canRetryRead;
 
   Future<void> loadAll() async {
     _isLoading = true;
     _errorMessage = null;
+    _canRetryRead = false;
     notifyListeners();
 
     try {
@@ -63,6 +67,7 @@ class FriendsController extends ChangeNotifier {
       ]);
     } catch (e) {
       _errorMessage = 'Không thể tải dữ liệu bạn bè: $e';
+      _canRetryRead = true;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -74,6 +79,7 @@ class FriendsController extends ChangeNotifier {
     if (!res.success) {
       _errorMessage =
           res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
+      _canRetryRead = true;
       notifyListeners();
     }
     if (res.success && res.data is List) {
@@ -89,6 +95,7 @@ class FriendsController extends ChangeNotifier {
     if (!res.success) {
       _errorMessage =
           res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
+      _canRetryRead = true;
       notifyListeners();
     }
     if (res.success && res.data is List) {
@@ -106,6 +113,7 @@ class FriendsController extends ChangeNotifier {
     if (!res.success) {
       _errorMessage =
           res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
+      _canRetryRead = true;
       notifyListeners();
     }
     if (res.success && res.data is List) {
@@ -123,6 +131,7 @@ class FriendsController extends ChangeNotifier {
     if (!res.success) {
       _errorMessage =
           res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
+      _canRetryRead = true;
       notifyListeners();
     }
     if (res.success && res.data is List) {
@@ -136,6 +145,8 @@ class FriendsController extends ChangeNotifier {
   Future<void> searchUsers(String query) async {
     final version = ++_searchVersion;
     _lastQuery = query.trim();
+    _errorMessage = null;
+    _canRetryRead = false;
     if (query.trim().isEmpty) {
       _searchResults = [];
       _isSearching = false;
@@ -155,6 +166,7 @@ class FriendsController extends ChangeNotifier {
       if (!res.success) {
         _errorMessage =
             res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
+        _canRetryRead = true;
         notifyListeners();
       }
       if (res.success && res.data is List) {
@@ -169,6 +181,8 @@ class FriendsController extends ChangeNotifier {
       }
     } catch (_) {
       _searchResults = [];
+      _errorMessage = 'Không thể tải dữ liệu. Vui lòng thử lại.';
+      _canRetryRead = true;
     } finally {
       if (version == _searchVersion) {
         _isSearching = false;
@@ -182,6 +196,8 @@ class FriendsController extends ChangeNotifier {
     _lastQuery = "";
     _searchResults = [];
     _isSearching = false;
+    _errorMessage = null;
+    _canRetryRead = false;
     notifyListeners();
   }
 
