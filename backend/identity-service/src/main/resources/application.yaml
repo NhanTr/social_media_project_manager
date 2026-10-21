@@ -1,0 +1,50 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: identity-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/social_media_ai_db}
+    username: ${DB_USERNAME:identity_service_user}
+    password: ${DB_PASSWORD:identity_password}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-this-local-development-secret-key-at-least-32-bytes}
+    access-token-expiration-minutes: 15
+    refresh-token-expiration-days: 30
+  internal-api-key: ${INTERNAL_API_KEY:loccoc-local-internal-key}
+  otp:
+    expiration-minutes: 5
+    expose-code: ${OTP_EXPOSE_CODE:true}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+  seed:
+    test-user:
+      enabled: ${SEED_TEST_USER:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    redis:
+      enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{requestId:-}]"
