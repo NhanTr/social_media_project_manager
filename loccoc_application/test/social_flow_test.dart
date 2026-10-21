@@ -47,6 +47,42 @@ void main() {
       expect(writes, 1);
     },
   );
+  test(
+    'failed mutations are replayed only after another user action',
+    () async {
+      final writes = <String, int>{};
+      final ctrl = FriendsController(
+        api: ApiClient(
+          client: MockClient((req) async {
+            writes.update(
+              req.url.path,
+              (count) => count + 1,
+              ifAbsent: () => 1,
+            );
+            return http.Response('{"detail":"temporary failure"}', 503);
+          }),
+        ),
+      );
+
+      expect(await ctrl.sendFriendRequest(2), isFalse);
+      expect(await ctrl.cancelFriendRequest(10), isFalse);
+      expect(await ctrl.blockUser(3), isFalse);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(writes['/api/v1/friend-requests'], 1);
+      expect(writes['/api/v1/friend-requests/10/cancel'], 1);
+      expect(writes['/api/v1/blocks/3'], 1);
+      expect(ctrl.canRetryRead, isFalse);
+
+      expect(await ctrl.sendFriendRequest(2), isFalse);
+      expect(await ctrl.cancelFriendRequest(10), isFalse);
+      expect(await ctrl.blockUser(3), isFalse);
+
+      expect(writes['/api/v1/friend-requests'], 2);
+      expect(writes['/api/v1/friend-requests/10/cancel'], 2);
+      expect(writes['/api/v1/blocks/3'], 2);
+    },
+  );
   test('tokens use secure storage and logout removes session', () async {
     final storage = SessionStorage();
     await storage.saveSession(

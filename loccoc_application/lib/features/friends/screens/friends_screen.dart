@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/retryable_async_view.dart';
 import '../friends_controller.dart';
 
 class FriendsScreen extends StatefulWidget {
@@ -46,6 +47,15 @@ class _FriendsScreenState extends State<FriendsScreen>
     widget.controller.clearSearch();
   }
 
+  Future<void> _retryRead() async {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) {
+      await widget.controller.loadAll();
+    } else {
+      await widget.controller.searchUsers(query);
+    }
+  }
+
   Future<void> _confirmBlock(int userId, String name) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -83,6 +93,7 @@ class _FriendsScreenState extends State<FriendsScreen>
       listenable: widget.controller,
       builder: (context, _) {
         final ctrl = widget.controller;
+        final isSearching = _searchController.text.trim().isNotEmpty;
 
         return Scaffold(
           appBar: AppBar(
@@ -149,34 +160,34 @@ class _FriendsScreenState extends State<FriendsScreen>
               ),
             ),
           ),
-          bottomNavigationBar: ctrl.errorMessage == null
+          bottomNavigationBar: ctrl.errorMessage == null || ctrl.canRetryRead
               ? null
               : MaterialBanner(
-                  content: Text(ctrl.errorMessage!),
+                  content: Text(
+                    RetryableAsyncView.safeMessage(ctrl.errorMessage!),
+                  ),
                   actions: [
                     TextButton(
-                      onPressed: () async {
-                        await ctrl.loadAll();
-                        if (_searchController.text.trim().isNotEmpty) {
-                          await ctrl.searchUsers(_searchController.text);
-                        }
-                      },
-                      child: const Text('Thử lại'),
+                      onPressed: ctrl.loadAll,
+                      child: const Text('Làm mới dữ liệu'),
                     ),
                   ],
                 ),
-          body: ctrl.isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _searchController.text.trim().isNotEmpty
-              ? _buildSearchResults(ctrl)
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildFriendsTab(ctrl),
-                    _buildRequestsTab(ctrl),
-                    _buildBlockedTab(ctrl),
-                  ],
-                ),
+          body: RetryableAsyncView(
+            isLoading: ctrl.isLoading || (isSearching && ctrl.isSearching),
+            errorMessage: ctrl.canRetryRead ? ctrl.errorMessage : null,
+            onRetry: ctrl.canRetryRead ? _retryRead : null,
+            child: isSearching
+                ? _buildSearchResults(ctrl)
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildFriendsTab(ctrl),
+                      _buildRequestsTab(ctrl),
+                      _buildBlockedTab(ctrl),
+                    ],
+                  ),
+          ),
         );
       },
     );

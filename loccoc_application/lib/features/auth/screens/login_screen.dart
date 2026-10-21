@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/retryable_async_view.dart';
 import '../auth_controller.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -129,31 +130,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 24),
 
                       if (controller.errorMessage != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.red.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 20,
-                                color: Colors.red.shade700,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  controller.errorMessage!,
-                                  style: TextStyle(
-                                    color: Colors.red.shade800,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ],
+                        SizedBox(
+                          height: 112,
+                          child: RetryableAsyncView(
+                            isLoading: false,
+                            errorMessage: controller.errorMessage,
+                            child: const SizedBox.shrink(),
                           ),
                         ),
                         const SizedBox(height: 16),
