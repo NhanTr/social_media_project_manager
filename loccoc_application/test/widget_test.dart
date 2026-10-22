@@ -42,6 +42,27 @@ void main() {
     expect(find.text('Đăng nhập với Google'), findsOneWidget);
   });
 
+  testWidgets('Google configuration error fits on an Android phone screen', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(648, 1080);
+    tester.view.devicePixelRatio = 1.5;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final authController = AuthController();
+    await authController.loginWithGoogle();
+    await tester.pumpWidget(
+      MaterialApp(home: LoginScreen(authController: authController)),
+    );
+
+    expect(
+      find.text('Đăng nhập Google chưa được cấu hình. Vui lòng dùng OTP.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('App routing navigates to LoginScreen when unauthenticated', (
     WidgetTester tester,
   ) async {

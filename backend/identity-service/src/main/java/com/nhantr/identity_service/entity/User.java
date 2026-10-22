@@ -34,7 +34,8 @@ public class User {
     @Column(name = "phone_number", unique = true, length = 30)
     private String phoneNumber;
 
-    @Column(name = "phone_lookup_hash", length = 64)
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "phone_lookup_hash", length = 64, columnDefinition = "CHAR(64)")
     private String phoneLookupHash;
 
     @Enumerated(EnumType.STRING)
