@@ -34,3 +34,6 @@
 # Docker local data
 postgres_data/
 minio_data/
+
+# Agent task ledgers and review scratch
+.superpowers/
