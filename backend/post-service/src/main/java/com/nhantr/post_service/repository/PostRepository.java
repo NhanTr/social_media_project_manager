@@ -10,8 +10,13 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
+    boolean existsByMediaUrlAndStatusIn(String mediaUrl, Collection<Post.Status> statuses);
+
+    Optional<Post> findByUserIdAndClientRequestId(Long userId, UUID clientRequestId);
+
     Optional<Post> findByIdAndStatus(Long id, Post.Status status);
 
     @Query("""

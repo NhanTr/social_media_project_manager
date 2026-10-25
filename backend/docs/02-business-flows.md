@@ -91,16 +91,18 @@ sequenceDiagram
     participant I as identity-service
     participant N as notification-service
 
-    A->>G: POST /media/upload (multipart file)
-    G->>P: Forward media
-    P->>O: Put object
-    O-->>P: Object URL
-    P-->>A: mediaType, mediaUrl, size, duration
-    A->>G: POST /posts (metadata + mediaUrl)
-    G->>P: Create post
-    P->>S: GET friend IDs
-    P->>N: NEW_POST cho từng friend
-    P-->>A: PostResponse
+    A->>G: POST /media/uploads (contentType, declaredSizeBytes)
+    G->>P: Create upload session
+    P-->>A: uploadId + presigned PUT URL (TTL 10 phút)
+    A->>O: PUT encoded media
+    A->>G: POST /media/uploads/{id}/finalize
+    P->>O: Validate object + copy sang published key
+    P-->>A: Frozen mediaType, mediaUrl, size, dimensions, duration
+    A->>G: POST /posts (frozen metadata + uploadId + clientRequestId UUID)
+    P->>P: Lock user + upload, replay hoặc create/consume trong transaction
+    P->>S: GET friend IDs (create mới)
+    P->>N: NEW_POST sau commit (create mới)
+    P-->>A: PostResponse (cùng ID khi retry payload giống)
 
     A->>G: GET /feed?cursor=&limit=
     P->>S: Lấy friend IDs
@@ -117,7 +119,11 @@ Quy tắc:
 - Filter ảnh và lưu vào Photos là client-side; backend chỉ lưu `filterApplied` và cung cấp media URL.
 - Widget gọi `GET /widget/latest-post` để lấy payload nhỏ gọn.
 
-Hiện file upload đi xuyên qua Gateway. Thiết kế production nên chuyển sang presigned URL để mobile upload trực tiếp object storage.
+Mobile mới persist UUID và payload trước network; retry sau response không chắc chắn phải giữ nguyên key/payload. Backend serialize theo user trong PostgreSQL transaction, unique `(user_id, client_request_id)`, so fingerprint để trả `409 POST_REQUEST_CONFLICT` khi key dùng sai. Replay không đổi trạng thái `DELETED`/`HIDDEN` và không gửi notification lần nữa. Hai field `clientRequestId`/`uploadId` phải đi cùng nhau; metadata phải trùng finalize và upload thuộc owner từ JWT.
+
+Finalize replay trả metadata đã lưu; object published tách khỏi key của presigned PUT để nội dung đã xác nhận không bị ghi đè. Cleanup khóa cùng upload row với finalize/create: upload chưa dùng hết hạn được dọn, upload đã consume không bị orphan cleanup xóa. Soft-delete vẫn lên lịch xóa file. Multipart `/media/upload` và create không có cả UUID/uploadId được giữ tương thích, không có bảo đảm deduplication cho create legacy.
+
+Migration: dev giữ V1–V4 đã áp dụng; media lifecycle dùng V5, reliability dùng V6. Không áp dụng trực tiếp chuỗi này lên DB từng chạy `V3__post_media_lifecycle.sql` của nhánh S2-01: phải kiểm tra Flyway history và lập reconcile riêng; không đổi tên/sửa migration đã chạy. Test runtime phải dùng database/volume tách biệt.
 
 ## 4. Chat realtime và trạng thái đọc
 

@@ -22,7 +22,7 @@ không được dùng làm bằng chứng production readiness.
 | Gateway runtime | WebFlux | Spring Cloud Gateway Web MVC | Giữ MVC và sửa tài liệu, hoặc lập migration riêng; không trộn config |
 | Request trace header | `X-Correlation-Id` | `X-Request-Id` | Chọn một tên; ưu tiên giữ `X-Request-Id` để tránh breaking change |
 | Xoá tài khoản | Có nơi ghi `/account/deletion` | `/account/delete-request` | Dùng endpoint theo code trong client |
-| Upload production | Presigned URL | Multipart đi qua Gateway | Bổ sung presigned flow trước khi tải lớn |
+| Upload media | Presigned URL | Presigned session/finalize + legacy multipart | Đã có MVP lifecycle/idempotency; signed/private access và processing còn hoãn |
 | Chat status | Sent/Delivered/Read | Sent và mark Read; delivery receipt chưa đầy đủ | Thiết kế API receipt |
 
 ## 2. API P0 nên bổ sung
@@ -39,24 +39,17 @@ Phục vụ UC-03 “gửi link mời”.
 
 Yêu cầu: token opaque, có TTL, rate limit, không lộ raw user ID và hoạt động với universal link/app store fallback.
 
-### 2.2 Presigned media upload
+### 2.2 Media lifecycle và resilient publication — đã triển khai MVP
 
-| Method | Path đề xuất | Mục đích |
-| --- | --- | --- |
-| POST | `/api/v1/media/uploads` | Xin upload session/presigned PUT |
-| POST | `/api/v1/media/uploads/{id}/complete` | Xác nhận object đã upload và validate metadata |
-| DELETE | `/api/v1/media/uploads/{id}` | Huỷ upload/orphan cleanup |
+- `POST /api/v1/media/uploads` → presigned PUT → `POST /api/v1/media/uploads/{id}/finalize` (replay owner an toàn, metadata persisted, copy sang published object).
+- `POST /api/v1/posts` hỗ trợ cặp `clientRequestId` UUID + `uploadId`; kiểm tra owner/finalized metadata, fingerprint + PostgreSQL lock/unique constraint chống duplicate retry đồng thời. Replay giữ cả trạng thái deleted/hidden, notification chỉ fan-out sau create commit.
+- Worker dọn upload abandoned, kể cả finalized chưa dùng; consumed upload được bảo vệ khỏi orphan cleanup. Multipart và legacy create được giữ tương thích.
+- Chưa có API hủy upload riêng; cancel phía client dừng request và để TTL cleanup. Private/signed media access, scanning/transcode và durable notification outbox còn ngoài MVP.
+- V5/V6 nối sau dev V1–V4. DB đã chạy V3 media trên nhánh S2-01 cần reconcile migration history riêng trước deploy; không đổi checksum hoặc rename migration đã áp dụng.
 
-Flow mới: app xin URL qua Gateway → upload trực tiếp MinIO/S3 → complete → tạo post.
+### 2.3 Quản lý post của owner — đã triển khai MVP
 
-### 2.3 Quản lý post của owner
-
-| Method | Path đề xuất | Mục đích |
-| --- | --- | --- |
-| PATCH | `/api/v1/posts/{id}` | Sửa caption/visibility |
-| DELETE | `/api/v1/posts/{id}` | Soft-delete bài của chính user |
-
-Phải kiểm tra ownership, block/report state và dùng optimistic locking nếu cho phép edit.
+`PUT /api/v1/posts/{id}` sửa caption/filter/visibility; `DELETE /api/v1/posts/{id}` soft-delete và lên lịch xóa media. Cả hai kiểm tra ownership tại post-service. Optimistic edit versioning chưa có.
 
 ### 2.4 Chat delivery receipt
 
@@ -140,7 +133,7 @@ Kafka chưa bắt buộc cho MVP; transactional outbox + worker REST đã đủ 
 
 1. Chuẩn hoá tài liệu và contract đang khác nhau.
 2. Rate limit OTP/login và harden secret/config.
-3. Presigned upload + media lifecycle.
+3. Media processing/private access và durable cleanup/notification observability (presigned lifecycle MVP đã có).
 4. Account deletion worker/cancel/status để đáp ứng policy thật.
 5. Push provider + outbox/idempotent retry.
 6. Chat delivered receipt và broker bền vững.

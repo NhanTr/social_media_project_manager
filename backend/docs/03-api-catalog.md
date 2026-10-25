@@ -145,8 +145,12 @@ Search result:
 
 | Method | Path | Auth | Input | Kết quả |
 | --- | --- | --- | --- | --- |
-| POST | `/api/v1/media/upload` | User | multipart `file` | `201`, media metadata/URL |
+| POST | `/api/v1/media/upload` | User | multipart `file` | `201`, media metadata/URL (deprecated, giữ cho client cũ) |
+| POST | `/api/v1/media/uploads` | User | `{contentType, declaredSizeBytes?}` | `201`, `{uploadId, presignedUrl, objectKey, expiresInSeconds}` — PUT file thẳng lên `presignedUrl`, TTL 10 phút |
+| POST | `/api/v1/media/uploads/{uploadId}/finalize` | User | — | `200`, media metadata/URL đã đóng băng (kiểm tra size/image/GIF ≤5s, trả `mediaWidth/mediaHeight`); replay owner trả cùng metadata; session sai/chết → `404/403/409`, chưa upload → `400 MEDIA_NOT_UPLOADED` |
 | POST | `/api/v1/posts` | User | `CreatePostRequest` | `201`, post |
+| PUT | `/api/v1/posts/{id}` | User | `{caption?, filterApplied?, visibility?}` (null = giữ nguyên) | Post đã cập nhật; không phải owner → `403` |
+| DELETE | `/api/v1/posts/{id}` | User | — | `204` soft delete (ẩn ngay khỏi feed, lên lịch xóa media); không phải owner → `403` |
 | GET | `/api/v1/posts/{id}` | User | — | Post nếu có quyền xem |
 | GET | `/api/v1/feed?cursor=&limit=20` | User | cursor | Page post bạn bè |
 | GET | `/api/v1/feed/by-friend/{friendId}` | User | cursor | Page post của một friend |
@@ -159,16 +163,18 @@ Search result:
 {
   "mediaType": "IMAGE",
   "mediaUrl": "https://...",
-  "thumbnailUrl": "https://...",
+  "thumbnailUrl": null,
   "mediaWidth": 1170,
   "mediaHeight": 2532,
   "fileSizeBytes": 123456,
-  "durationSeconds": 0,
+  "durationSeconds": null,
   "caption": "Hello",
   "filterApplied": "warm",
   "aiGenerated": false,
   "aiGenerationId": null,
-  "visibility": "FRIENDS_ONLY"
+  "visibility": "FRIENDS_ONLY",
+  "clientRequestId": "b018e65a-454a-4d83-9104-5439a21d4e6c",
+  "uploadId": 12
 }
 ```
 
@@ -177,6 +183,15 @@ Enums:
 - `mediaType`: `IMAGE`, `GIF`.
 - `visibility`: `PUBLIC`, `FRIENDS_ONLY`, `PRIVATE`.
 - `durationSeconds`: 0–5.
+
+Publication retry contract (S2-02):
+
+- `clientRequestId` là UUID tùy chọn; `uploadId` là positive integer tùy chọn. Client mới gửi cả hai; chỉ gửi một trả `400 POST_UPLOAD_BINDING_REQUIRED`. Client cũ bỏ cả hai vẫn dùng contract cũ và không có bảo đảm deduplication.
+- Upload phải thuộc user từ JWT, ở trạng thái `FINALIZED` và chưa dùng cho post khác. Sai owner → `403 UPLOAD_FORBIDDEN`; chưa finalized → `409 UPLOAD_NOT_FINALIZED`; đã dùng → `409 UPLOAD_ALREADY_CONSUMED`.
+- Các field `mediaType`, `mediaUrl`, `fileSizeBytes`, `mediaWidth`, `mediaHeight`, `durationSeconds` phải đúng response finalize; `thumbnailUrl` phải null. Sai metadata → `400 UPLOAD_METADATA_MISMATCH`. Caption tối đa 2000 ký tự.
+- Cùng user + UUID + payload trả cùng post ID (kể cả post `DELETED`/`HIDDEN`), không tạo lại post hoặc fan-out notification. Payload khác dưới cùng UUID → `409 POST_REQUEST_CONFLICT`. Giữ nguyên payload đã gửi khi retry sau timeout.
+- Finalize chỉ owner được replay; trả metadata đã lưu, kể cả sau khi post dùng upload. Finalize copy object sang key published mà presigned PUT cũ không thể ghi đè; `mediaUrl` finalize là URL client phải dùng. Upload expired → `409 UPLOAD_SESSION_EXPIRED`/`UPLOAD_SESSION_CLOSED`.
+- Worker hết hạn upload chưa được sử dụng (cả `UPLOADING` và `FINALIZED`) khi TTL đã qua; upload đang được post dùng được loại khỏi orphan cleanup. Soft-delete của owner vẫn lên lịch xóa media tương ứng.
 
 ## 5. Notification API
 
