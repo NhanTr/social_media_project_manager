@@ -5,6 +5,17 @@ import '../../core/network/api_client.dart';
 
 class FriendsController extends ChangeNotifier {
   final ApiClient api;
+  bool _disposed = false;
+  void _emit() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    ++_searchVersion;
+    super.dispose();
+  }
 
   List<FriendSummary> _friends = [];
   List<FriendRequestModel> _incomingRequests = [];
@@ -20,7 +31,7 @@ class FriendsController extends ChangeNotifier {
     if (!_pendingActions.add(key)) return false;
     _errorMessage = null;
     _canRetryRead = false;
-    notifyListeners();
+    _emit();
     try {
       final result = await action();
       if (result && _lastQuery.isNotEmpty) await searchUsers(_lastQuery);
@@ -30,11 +41,13 @@ class FriendsController extends ChangeNotifier {
       return false;
     } finally {
       _pendingActions.remove(key);
-      notifyListeners();
+      _emit();
     }
   }
 
   String _lastQuery = '';
+  bool _hasLoadedFriends = false;
+  bool get hasLoadedFriends => _hasLoadedFriends;
   bool _isLoading = false;
   bool _isSearching = false;
   String? _errorMessage;
@@ -56,7 +69,7 @@ class FriendsController extends ChangeNotifier {
     _isLoading = true;
     _errorMessage = null;
     _canRetryRead = false;
-    notifyListeners();
+    _emit();
 
     try {
       await Future.wait([
@@ -70,7 +83,7 @@ class FriendsController extends ChangeNotifier {
       _canRetryRead = true;
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _emit();
     }
   }
 
@@ -80,13 +93,14 @@ class FriendsController extends ChangeNotifier {
       _errorMessage =
           res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
       _canRetryRead = true;
-      notifyListeners();
+      _emit();
     }
     if (res.success && res.data is List) {
+      _hasLoadedFriends = true;
       _friends = (res.data as List)
           .map((item) => FriendSummary.fromJson(item as Map<String, dynamic>))
           .toList();
-      notifyListeners();
+      _emit();
     }
   }
 
@@ -96,7 +110,7 @@ class FriendsController extends ChangeNotifier {
       _errorMessage =
           res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
       _canRetryRead = true;
-      notifyListeners();
+      _emit();
     }
     if (res.success && res.data is List) {
       _incomingRequests = (res.data as List)
@@ -104,7 +118,7 @@ class FriendsController extends ChangeNotifier {
             (item) => FriendRequestModel.fromJson(item as Map<String, dynamic>),
           )
           .toList();
-      notifyListeners();
+      _emit();
     }
   }
 
@@ -114,7 +128,7 @@ class FriendsController extends ChangeNotifier {
       _errorMessage =
           res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
       _canRetryRead = true;
-      notifyListeners();
+      _emit();
     }
     if (res.success && res.data is List) {
       _outgoingRequests = (res.data as List)
@@ -122,7 +136,7 @@ class FriendsController extends ChangeNotifier {
             (item) => FriendRequestModel.fromJson(item as Map<String, dynamic>),
           )
           .toList();
-      notifyListeners();
+      _emit();
     }
   }
 
@@ -132,13 +146,13 @@ class FriendsController extends ChangeNotifier {
       _errorMessage =
           res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
       _canRetryRead = true;
-      notifyListeners();
+      _emit();
     }
     if (res.success && res.data is List) {
       _blockedUsers = (res.data as List)
           .map((item) => BlockModel.fromJson(item as Map<String, dynamic>))
           .toList();
-      notifyListeners();
+      _emit();
     }
   }
 
@@ -150,12 +164,12 @@ class FriendsController extends ChangeNotifier {
     if (query.trim().isEmpty) {
       _searchResults = [];
       _isSearching = false;
-      notifyListeners();
+      _emit();
       return;
     }
 
     _isSearching = true;
-    notifyListeners();
+    _emit();
 
     try {
       final res = await api.get(
@@ -167,7 +181,7 @@ class FriendsController extends ChangeNotifier {
         _errorMessage =
             res.errorMessage ?? 'Không thể tải dữ liệu. Vui lòng thử lại.';
         _canRetryRead = true;
-        notifyListeners();
+        _emit();
       }
       if (res.success && res.data is List) {
         _searchResults = (res.data as List)
@@ -186,7 +200,7 @@ class FriendsController extends ChangeNotifier {
     } finally {
       if (version == _searchVersion) {
         _isSearching = false;
-        notifyListeners();
+        _emit();
       }
     }
   }
@@ -198,7 +212,7 @@ class FriendsController extends ChangeNotifier {
     _isSearching = false;
     _errorMessage = null;
     _canRetryRead = false;
-    notifyListeners();
+    _emit();
   }
 
   Future<bool> sendFriendRequest(int receiverId) =>
@@ -214,7 +228,7 @@ class FriendsController extends ChangeNotifier {
       return true;
     } else {
       _errorMessage = res.errorMessage ?? 'Không thể gửi lời mời kết bạn.';
-      notifyListeners();
+      _emit();
       return false;
     }
   }
@@ -228,7 +242,7 @@ class FriendsController extends ChangeNotifier {
     if (index < 0) return false;
     final pending = _incomingRequests[index];
     _incomingRequests.removeWhere((r) => r.id == requestId);
-    notifyListeners();
+    _emit();
 
     final res = await api.post('/api/v1/friend-requests/$requestId/accept');
     if (res.success) {
@@ -242,7 +256,7 @@ class FriendsController extends ChangeNotifier {
         );
       }
       _errorMessage = res.errorMessage ?? 'Không thể chấp nhận lời mời.';
-      notifyListeners();
+      _emit();
       return false;
     }
   }
@@ -254,11 +268,11 @@ class FriendsController extends ChangeNotifier {
     final res = await api.post('/api/v1/friend-requests/$requestId/decline');
     if (res.success) {
       _incomingRequests.removeWhere((r) => r.id == requestId);
-      notifyListeners();
+      _emit();
       return true;
     } else {
       _errorMessage = res.errorMessage ?? 'Không thể từ chối lời mời.';
-      notifyListeners();
+      _emit();
       return false;
     }
   }
@@ -271,7 +285,7 @@ class FriendsController extends ChangeNotifier {
           return false;
         }
         _outgoingRequests.removeWhere((r) => r.id == requestId);
-        notifyListeners();
+        _emit();
         return true;
       });
 
@@ -285,11 +299,11 @@ class FriendsController extends ChangeNotifier {
       _incomingRequests.removeWhere((r) => r.senderId == userId);
       _outgoingRequests.removeWhere((r) => r.receiverId == userId);
       await loadBlockedUsers();
-      notifyListeners();
+      _emit();
       return true;
     } else {
       _errorMessage = res.errorMessage ?? 'Không thể chặn người dùng.';
-      notifyListeners();
+      _emit();
       return false;
     }
   }
@@ -301,11 +315,11 @@ class FriendsController extends ChangeNotifier {
     final res = await api.delete('/api/v1/blocks/$userId');
     if (res.success) {
       _blockedUsers.removeWhere((b) => b.blockedId == userId);
-      notifyListeners();
+      _emit();
       return true;
     } else {
       _errorMessage = res.errorMessage ?? 'Không thể bỏ chặn.';
-      notifyListeners();
+      _emit();
       return false;
     }
   }
