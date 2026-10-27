@@ -29,6 +29,23 @@ public class PostController {
         return storage.upload(user.id(), file);
     }
 
+    @PostMapping("/api/v1/media/uploads")
+    @ResponseStatus(HttpStatus.CREATED)
+    public MediaStorageService.UploadSessionResponse createUploadSession(
+            @AuthenticationPrincipal CurrentUser user,
+            @Valid @RequestBody MediaStorageService.UploadSessionRequest request
+    ) {
+        return storage.createUploadSession(user.id(), request);
+    }
+
+    @PostMapping("/api/v1/media/uploads/{uploadId}/finalize")
+    public MediaStorageService.UploadResponse finalizeUpload(
+            @AuthenticationPrincipal CurrentUser user,
+            @PathVariable Long uploadId
+    ) {
+        return storage.finalizeUpload(user.id(), uploadId);
+    }
+
     @PostMapping("/api/v1/posts")
     @ResponseStatus(HttpStatus.CREATED)
     public PostService.PostResponse create(
@@ -36,6 +53,21 @@ public class PostController {
             @Valid @RequestBody PostService.CreatePostRequest request
     ) {
         return posts.create(user.id(), request);
+    }
+
+    @PutMapping("/api/v1/posts/{id}")
+    public PostService.PostResponse update(
+            @AuthenticationPrincipal CurrentUser user,
+            @PathVariable Long id,
+            @Valid @RequestBody PostService.UpdatePostRequest request
+    ) {
+        return posts.update(user.id(), id, request);
+    }
+
+    @DeleteMapping("/api/v1/posts/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@AuthenticationPrincipal CurrentUser user, @PathVariable Long id) {
+        posts.delete(user.id(), id);
     }
 
     @GetMapping("/api/v1/posts/{id}")

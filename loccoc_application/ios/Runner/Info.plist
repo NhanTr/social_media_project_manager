@@ -2,6 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>LocCoc dùng camera để chụp ảnh bạn muốn chia sẻ với bạn bè.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>LocCoc cho phép bạn chọn ảnh để chia sẻ với bạn bè.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>LocCoc lưu ảnh bạn chọn vào thư viện Ảnh.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

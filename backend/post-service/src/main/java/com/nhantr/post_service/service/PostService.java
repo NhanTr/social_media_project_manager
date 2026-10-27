@@ -6,11 +6,19 @@ import com.nhantr.post_service.client.IdentityClient;
 import com.nhantr.post_service.client.NotificationClient;
 import com.nhantr.post_service.client.SocialClient;
 import com.nhantr.post_service.entity.Post;
+import com.nhantr.post_service.entity.MediaUpload;
+import com.nhantr.post_service.repository.MediaUploadRepository;
+import com.nhantr.post_service.repository.PublicationLock;
 import com.nhantr.post_service.repository.PostRepository;
+import com.nhantr.post_service.storage.MediaCleanupService;
 import jakarta.validation.constraints.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tools.jackson.databind.json.JsonMapper;
+import java.security.MessageDigest;
 
 import java.time.Instant;
 import java.util.*;
@@ -23,22 +31,72 @@ public class PostService {
     private final SocialClient social;
     private final IdentityClient identity;
     private final NotificationClient notifications;
+    private final MediaCleanupService cleanup;
+    private final MediaUploadRepository uploads;
+    private final PublicationLock publicationLock;
 
-    public PostService(PostRepository repository, SocialClient social, IdentityClient identity, NotificationClient notifications) {
+    public PostService(
+            PostRepository repository,
+            SocialClient social,
+            IdentityClient identity,
+            NotificationClient notifications,
+            MediaCleanupService cleanup,
+            MediaUploadRepository uploads,
+            PublicationLock publicationLock
+    ) {
         this.repository = repository;
         this.social = social;
         this.identity = identity;
         this.notifications = notifications;
+        this.cleanup = cleanup;
+        this.uploads = uploads;
+        this.publicationLock = publicationLock;
     }
 
     @Transactional
     public PostResponse create(Long userId, CreatePostRequest request) {
+        if ((request.clientRequestId() == null) != (request.uploadId() == null)) {
+            throw ApiException.badRequest("POST_UPLOAD_BINDING_REQUIRED", "clientRequestId and uploadId must be provided together.");
+        }
+        String fingerprint = null;
+        MediaUpload upload = null;
+        if (request.clientRequestId() != null) {
+            publicationLock.acquire(userId);
+            fingerprint = fingerprint(request);
+            Optional<Post> replay = repository.findByUserIdAndClientRequestId(userId, request.clientRequestId());
+            if (replay.isPresent()) {
+                if (!fingerprint.equals(replay.get().getRequestFingerprint())) {
+                    throw ApiException.conflict("POST_REQUEST_CONFLICT", "The publication key was already used with another payload.");
+                }
+                return response(replay.get(), authorMap(List.of(userId)));
+            }
+            upload = uploads.lockById(request.uploadId())
+                    .orElseThrow(() -> ApiException.notFound("UPLOAD_SESSION_NOT_FOUND", "Upload session not found."));
+            if (!userId.equals(upload.getUserId())) {
+                throw ApiException.forbidden("UPLOAD_FORBIDDEN", "Upload session belongs to another user.");
+            }
+            if (upload.getStatus() != MediaUpload.Status.FINALIZED || upload.getFileSizeBytes() == null) {
+                throw ApiException.conflict("UPLOAD_NOT_FINALIZED", "Finalize this upload before publishing.");
+            }
+            if (upload.getConsumedPostId() != null) {
+                throw ApiException.conflict("UPLOAD_ALREADY_CONSUMED", "This upload was already published.");
+            }
+            if (!Objects.equals(request.mediaType().name(), upload.getMediaType())
+                    || !Objects.equals(request.mediaUrl(), upload.getMediaUrl())
+                    || !Objects.equals(request.fileSizeBytes(), upload.getFileSizeBytes())
+                    || !Objects.equals(request.mediaWidth(), upload.getMediaWidth())
+                    || !Objects.equals(request.mediaHeight(), upload.getMediaHeight())
+                    || !Objects.equals(request.durationSeconds(), upload.getDurationSeconds())
+                    || request.thumbnailUrl() != null) {
+                throw ApiException.badRequest("UPLOAD_METADATA_MISMATCH", "Media metadata must match the finalized upload.");
+            }
+        }
         if (request.mediaType() == Post.MediaType.GIF
                 && request.durationSeconds() != null
                 && request.durationSeconds() > 5) {
             throw ApiException.badRequest("GIF_TOO_LONG", "GIF duration must not exceed 5 seconds.");
         }
-        Post post = repository.save(new Post(
+        Post post = new Post(
                 userId,
                 request.mediaType(),
                 request.mediaUrl(),
@@ -52,16 +110,64 @@ public class PostService {
                 Boolean.TRUE.equals(request.aiGenerated()),
                 request.aiGenerationId(),
                 request.visibility()
-        ));
+        );
+        if (upload != null) post.bindPublication(request.clientRequestId(), fingerprint, upload.getId());
+        post = repository.save(post);
+        if (upload != null) upload.consume(post.getId());
         List<Long> friendIds = social.friendIds(userId);
-        friendIds.forEach(friendId -> notifications.newPost(friendId, userId, post.getId()));
+        Long postId = post.getId();
+        Runnable fanOut = () -> friendIds.forEach(friendId -> notifications.newPost(friendId, userId, postId));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { fanOut.run(); }
+            });
+        } else {
+            fanOut.run();
+        }
         return response(post, authorMap(List.of(userId)));
+    }
+
+    private String fingerprint(CreatePostRequest request) {
+        try {
+            byte[] payload = JsonMapper.builder().build().writeValueAsBytes(request);
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(payload));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 is unavailable.", impossible);
+        }
     }
 
     public PostResponse get(Long currentUserId, Long postId) {
         Post post = active(postId);
         authorizeView(currentUserId, post);
         return response(post, authorMap(List.of(post.getUserId())));
+    }
+
+    @Transactional
+    public PostResponse update(Long currentUserId, Long postId, UpdatePostRequest request) {
+        Post post = active(postId);
+        requireOwner(currentUserId, post, "Only the owner can update this post.");
+        if (request.caption() != null) post.setCaption(normalize(request.caption()));
+        if (request.filterApplied() != null) post.setFilterApplied(normalize(request.filterApplied()));
+        if (request.visibility() != null) post.setVisibility(request.visibility());
+        return response(repository.save(post), authorMap(List.of(post.getUserId())));
+    }
+
+    /**
+     * Soft delete: ẩn ngay khỏi feed (status=DELETED) và lên lịch xóa media vật lý.
+     */
+    @Transactional
+    public void delete(Long currentUserId, Long postId) {
+        Post post = active(postId);
+        requireOwner(currentUserId, post, "Only the owner can delete this post.");
+        post.markDeleted();
+        repository.save(post);
+        cleanup.enqueueFromMediaUrl(post.getMediaUrl());
+    }
+
+    private void requireOwner(Long currentUserId, Post post, String message) {
+        if (!currentUserId.equals(post.getUserId())) {
+            throw ApiException.forbidden("POST_FORBIDDEN", message);
+        }
     }
 
     public PageResponse<PostResponse> feed(Long userId, String cursor, int requestedLimit) {
@@ -185,6 +291,15 @@ public class PostService {
             @Size(max = 100) String filterApplied,
             Boolean aiGenerated,
             Long aiGenerationId,
+            Post.Visibility visibility,
+            UUID clientRequestId,
+            @Positive Long uploadId
+    ) {}
+
+    /** Field null nghĩa là giữ nguyên giá trị hiện tại. */
+    public record UpdatePostRequest(
+            @Size(max = 2000) String caption,
+            @Size(max = 100) String filterApplied,
             Post.Visibility visibility
     ) {}
 
@@ -205,6 +320,12 @@ public class PostService {
             if (value == null || value.isBlank()) return new Cursor(null, Long.MAX_VALUE);
             try {
                 String decoded = new String(Base64.getUrlDecoder().decode(value));
+                if (decoded.startsWith("v2|")) {
+                    String[] parts = decoded.split("\\|", -1);
+                    if (parts.length != 3) throw new IllegalArgumentException("Invalid cursor fields");
+                    return new Cursor(Instant.parse(parts[1]), Long.parseLong(parts[2]));
+                }
+                // Continue accepting cursors emitted by older service versions.
                 String[] parts = decoded.split(":", 2);
                 return new Cursor(Instant.ofEpochMilli(Long.parseLong(parts[0])), Long.parseLong(parts[1]));
             } catch (RuntimeException exception) {
@@ -214,7 +335,7 @@ public class PostService {
         static Cursor of(Post post) { return new Cursor(post.getCreatedAt(), post.getId()); }
         String encode() {
             return Base64.getUrlEncoder().withoutPadding()
-                    .encodeToString((time.toEpochMilli() + ":" + id).getBytes());
+                    .encodeToString(("v2|" + time + "|" + id).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
     }
 }

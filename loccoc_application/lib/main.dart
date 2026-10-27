@@ -57,7 +57,10 @@ class LocCocApp extends StatelessWidget {
       case AuthStatus.requiresTerms:
         return TermsScreen(authController: authController);
       case AuthStatus.authenticated:
-        return AppShell(authController: authController);
+        return AppShell(
+          key: ValueKey(authController.currentUser?.id),
+          authController: authController,
+        );
     }
   }
 }
