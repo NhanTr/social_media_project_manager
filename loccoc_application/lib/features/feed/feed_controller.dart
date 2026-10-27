@@ -74,9 +74,22 @@ class FeedController extends ChangeNotifier {
     try {
       final page = await api.feed(friendId: filter);
       if (!_current(generation)) return;
-      _items = _unique(page.items);
+      final nextItems = _unique(page.items);
+      final nextHasMore = page.hasNext && page.nextCursor != null;
+      final nextIds = nextItems.map((p) => p.id).toSet();
+      final oldestNext = nextItems.isEmpty ? null : nextItems.last;
+      for (final old in _items) {
+        if ((filter == null || old.userId == filter) &&
+            !nextIds.contains(old.id) &&
+            (!nextHasMore ||
+                oldestNext == null ||
+                old.compareFeedPosition(oldestNext) <= 0)) {
+          _removed.add(old.id);
+        }
+      }
+      _items = nextItems;
       _cursor = page.nextCursor;
-      hasNext = page.hasNext && _cursor != null;
+      hasNext = nextHasMore;
       _previews.clear();
       offline = false;
       lastSuccess = DateTime.now();
@@ -88,12 +101,17 @@ class FeedController extends ChangeNotifier {
         if (!_current(generation)) return;
       }
       // Write metadata first: even process termination must not resurrect deleted posts.
-      await _cacheSafely(
-        () => cache.write(
+      await _cacheSafely(() async {
+        final evicted = await cache.write(
           filter,
           FeedSnapshot(posts: _items, savedAt: lastSuccess!),
-        ),
-      );
+          hasMore: hasNext,
+        );
+        if (_current(generation) && evicted.isNotEmpty) {
+          _removed.addAll(evicted);
+          _emit();
+        }
+      });
       if (!_current(generation) || _items.isEmpty) return;
       final first = _items.take(FeedCache.maxPosts).toList();
       final results = await Future.wait(
@@ -130,6 +148,7 @@ class FeedController extends ChangeNotifier {
             savedAt: lastSuccess!,
             previews: Map.of(_previews),
           ),
+          hasMore: hasNext || _items.length > first.length,
         ),
       );
       if (_current(generation)) _emit();

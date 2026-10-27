@@ -82,7 +82,11 @@ class FeedScreenState extends State<FeedScreen> {
     }
   }
 
-  Future<void> refresh() => _controller.refresh();
+  Future<void> refresh() {
+    unawaited(_loadFriends());
+    return _controller.refresh();
+  }
+
   Future<void> invalidateFriendships(Set<int> currentFriendIds) async {
     _friends = _friends.where((f) => currentFriendIds.contains(f.id)).toList();
     if (mounted) setState(() {});

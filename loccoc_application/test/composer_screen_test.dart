@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:loccoc_application/features/composer/composer_controller.dart';
+import 'package:loccoc_application/features/composer/composer_image.dart';
 import 'package:loccoc_application/features/composer/composer_screen.dart';
 
 import 'composer_controller_test.dart' as fixtures;
@@ -145,4 +146,53 @@ void main() {
     expect(find.text('Thử lại để xác nhận'), findsOneWidget);
     expect(find.textContaining('nội dung đang được khóa'), findsOneWidget);
   });
+  testWidgets(
+    'camera and gallery permission denial displays guidance and allows retry after granting',
+    (tester) async {
+      final store = fixtures.MemoryDrafts();
+      final api = fixtures.Api(store);
+      final picker = fixtures.Picker()
+        ..failure = const PhotoException(
+          'Quyền máy ảnh hoặc thư viện ảnh đã bị từ chối. Mở Cài đặt ứng dụng, cấp quyền rồi thử lại.',
+        );
+      final controller = ComposerController(
+        api: api,
+        accountId: 1,
+        store: store,
+        picker: picker,
+        processor: fixtures.Processor(),
+        upload: fixtures.Transport(),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ComposerScreen(api: api, accountId: 1, controller: controller),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Máy ảnh'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.textContaining('Mở Cài đặt ứng dụng, cấp quyền rồi thử lại.'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        find.textContaining('Mở Cài đặt ứng dụng, cấp quyền rồi thử lại.'),
+        findsOneWidget,
+      );
+      picker.failure = null;
+      await tester.scrollUntilVisible(
+        find.text('Thư viện'),
+        -180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Thư viện'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Mở Cài đặt ứng dụng, cấp quyền rồi thử lại.'),
+        findsNothing,
+      );
+      expect(controller.source, [1, 2, 3]);
+    },
+  );
 }

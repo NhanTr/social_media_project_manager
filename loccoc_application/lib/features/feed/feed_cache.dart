@@ -78,12 +78,49 @@ class FeedCache {
     }
   });
 
-  Future<void> write(int? friendId, FeedSnapshot snapshot) => _run(() async {
+  Future<Set<int>> write(
+    int? friendId,
+    FeedSnapshot snapshot, {
+    bool hasMore = false,
+  }) => _run(() async {
     final all = await _load();
-    // Insertion order is recency order and is deterministic across restarts.
-    all.remove(_filter(friendId));
+    final filterKey = _filter(friendId);
     final posts = snapshot.posts.take(maxPosts).toList();
-    all[_filter(friendId)] = {
+    // Reconcile against the complete response, before bounding persisted previews.
+    final currentIds = snapshot.posts.map((p) => p.id).toSet();
+    final evictedIds = <int>{};
+    final oldestCurrent = snapshot.posts.isEmpty ? null : snapshot.posts.last;
+    for (final raw in all.values.cast<Map>()) {
+      for (final json in (raw['posts'] as List? ?? [])) {
+        final previous = PostModel.fromJson(
+          Map<String, dynamic>.from(json as Map),
+        );
+        if (currentIds.contains(previous.id) ||
+            (friendId != null && previous.userId != friendId)) {
+          continue;
+        }
+        // A partial page is authoritative only down to its complete cursor key.
+        if (!hasMore ||
+            oldestCurrent != null &&
+                previous.compareFeedPosition(oldestCurrent) <= 0) {
+          evictedIds.add(previous.id);
+        }
+      }
+    }
+    // Insertion order is recency order and is deterministic across restarts.
+    all.remove(filterKey);
+    if (evictedIds.isNotEmpty) {
+      for (final raw in all.values.cast<Map>()) {
+        (raw['posts'] as List).removeWhere(
+          (p) => evictedIds.contains(((p as Map)['id'] as num).toInt()),
+        );
+        final previews = raw['previews'] as Map;
+        for (final id in evictedIds) {
+          previews.remove(id.toString());
+        }
+      }
+    }
+    all[filterKey] = {
       'savedAt': snapshot.savedAt.toUtc().toIso8601String(),
       'posts': posts.map((p) => p.toJson()).toList(),
       'previews': {
@@ -112,6 +149,7 @@ class FeedCache {
       }
     }
     await _save(all);
+    return evictedIds;
   });
 
   Future<void> remove(int? friendId) => _run(() async {

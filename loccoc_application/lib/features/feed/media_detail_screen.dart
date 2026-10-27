@@ -45,6 +45,11 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   void _checkAccess() {
     if (widget.isSessionActive?.call() == false) {
       unawaited(_controller.invalidateAccess());
+    } else if (!_controller.loading &&
+        !_controller.saving &&
+        !_controller.unavailable) {
+      // A partial feed page cannot prove that an older open post still exists.
+      unawaited(_controller.load());
     }
   }
 

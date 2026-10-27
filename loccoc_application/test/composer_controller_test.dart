@@ -1,14 +1,43 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:loccoc_application/core/models/post_models.dart';
 import 'package:loccoc_application/core/network/api_client.dart';
 import 'package:loccoc_application/core/network/posts_api.dart';
 import 'package:loccoc_application/features/composer/composer_controller.dart';
 import 'package:loccoc_application/features/composer/composer_image.dart';
 import 'package:loccoc_application/features/composer/composer_adapters.dart';
+
+class FakeImagePicker extends ImagePicker {
+  PlatformException? pickError;
+  LostDataResponse? lostData;
+  PlatformException? lostError;
+  Future<XFile?> Function()? onPick;
+  @override
+  Future<XFile?> pickImage({
+    required ImageSource source,
+    double? maxWidth,
+    double? maxHeight,
+    int? imageQuality,
+    CameraDevice preferredCameraDevice = CameraDevice.rear,
+    bool requestFullMetadata = true,
+  }) async {
+    if (pickError != null) throw pickError!;
+    if (onPick != null) return onPick!();
+    return null;
+  }
+
+  @override
+  Future<LostDataResponse> retrieveLostData() async {
+    if (lostError != null) throw lostError!;
+    return lostData ?? LostDataResponse.empty();
+  }
+}
 
 class MemoryDrafts implements ComposerDraftStore {
   Map<String, dynamic>? value;
@@ -435,5 +464,175 @@ void main() {
     expect(await controller.publish(), isNull);
     expect(api.uploads, 0);
     expect(controller.error, contains('2000'));
+  });
+  test('NativeComposerPhotoPicker maps camera and gallery permission denial and Android lost recovery errors to guidance', () async {
+    final fake = FakeImagePicker()
+      ..pickError = PlatformException(
+        code: 'camera_access_denied',
+        message: 'The user did not allow camera access.',
+      );
+    SharedPreferences.setMockInitialValues({});
+    final nativePicker = NativeComposerPhotoPicker(accountId: 1, picker: fake);
+    await expectLater(
+      nativePicker.pick(camera: true),
+      throwsA(
+        isA<PhotoException>().having(
+          (e) => e.message,
+          'guidance',
+          contains('Mở Cài đặt ứng dụng'),
+        ),
+      ),
+    );
+    fake.pickError = PlatformException(
+      code: 'photo_access_restricted',
+      message: 'Restricted',
+    );
+    await expectLater(
+      nativePicker.pick(camera: false),
+      throwsA(
+        isA<PhotoException>().having(
+          (e) => e.message,
+          'guidance',
+          contains('Mở Cài đặt ứng dụng'),
+        ),
+      ),
+    );
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await (await SharedPreferences.getInstance()).setString(
+        NativeComposerPhotoPicker.recoveryOwnerKey,
+        '1:pending',
+      );
+      fake.lostData = LostDataResponse(
+        exception: PlatformException(
+          code: 'camera_access_denied',
+          message: 'Denied',
+        ),
+      );
+      await controller.initialize();
+      await controller.pick(camera: false);
+      await controller.setCaption('giữ nháp');
+      final restored = ComposerController(
+        api: api,
+        accountId: 1,
+        store: store,
+        picker: nativePicker,
+        processor: Processor(),
+        upload: upload,
+      );
+      await restored.initialize();
+      expect(restored.source, [1, 2, 3]);
+      expect(restored.caption, 'giữ nháp');
+      expect(restored.error, contains('Mở Cài đặt ứng dụng'));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+  test('Android global lost photo without an owner cannot enter another account draft', () async {
+    SharedPreferences.setMockInitialValues({});
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      final native = NativeComposerPhotoPicker(
+        accountId: 2,
+        picker: FakeImagePicker()
+          ..lostData = LostDataResponse(
+            files: [
+              XFile.fromData(Uint8List.fromList([8, 9]), name: 'private.jpg'),
+            ],
+          ),
+      );
+      final nextAccount = ComposerController(
+        api: api,
+        accountId: 2,
+        store: MemoryDrafts(),
+        picker: native,
+        processor: Processor(),
+        upload: upload,
+      );
+      await nextAccount.initialize();
+      expect(nextAccount.source, isNull);
+      nextAccount.dispose();
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  test(
+    'Android lost photo is restored only for its durable picker owner',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        for (final accountId in [1, 2]) {
+          SharedPreferences.setMockInitialValues({
+            NativeComposerPhotoPicker.recoveryOwnerKey: '1:previous-process',
+          });
+          final native = NativeComposerPhotoPicker(
+            accountId: accountId,
+            picker: FakeImagePicker()
+              ..lostData = LostDataResponse(
+                files: [
+                  XFile.fromData(
+                    Uint8List.fromList([8, 9]),
+                    name: 'private.jpg',
+                  ),
+                ],
+              ),
+          );
+          expect(await native.recover(), accountId == 1 ? [8, 9] : isNull);
+        }
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
+  test('Android picker persists ownership before native launch and clears a cancelled selection', () async {
+    SharedPreferences.setMockInitialValues({});
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final fake = FakeImagePicker()
+        ..onPick = () async {
+          expect(
+            preferences.getString(NativeComposerPhotoPicker.recoveryOwnerKey),
+            startsWith('1:'),
+          );
+          return null;
+        };
+      await NativeComposerPhotoPicker(
+        accountId: 1,
+        picker: fake,
+      ).pick(camera: false);
+      expect(
+        preferences.getString(NativeComposerPhotoPicker.recoveryOwnerKey),
+        isNull,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  test('expired upload session during publish reconciliation unlocks session and reuploads prepared photo', () async {
+    await controller.initialize();
+    await controller.pick(camera: false);
+    await controller.setCaption('hello');
+    final key = controller.clientRequestId;
+    api.failPublish = true;
+    expect(await controller.publish(), isNull);
+    expect(controller.uncertain, isTrue);
+    api.failPublish = false;
+    api.publishError = const PostApiException(
+      statusCode: 409,
+      code: 'UPLOAD_NOT_FINALIZED',
+      message: 'Finalize this upload before publishing.',
+    );
+    expect(await controller.publish(), isNull);
+    expect(controller.uncertain, isFalse);
+    expect(controller.canEdit, isTrue);
+    api.publishError = null;
+    expect((await controller.publish())!.id, 7);
+    expect(controller.clientRequestId, key);
+    expect(api.uploads, 2);
+    expect(upload.calls, 2);
   });
 }

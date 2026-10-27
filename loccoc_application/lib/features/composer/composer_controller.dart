@@ -32,7 +32,7 @@ class ComposerController extends ChangeNotifier {
     PhotoProcessor? processor,
     PhotoUploadTransport? upload,
   }) : _store = store ?? LocalComposerDraftStore(accountId),
-       _picker = picker ?? NativeComposerPhotoPicker(),
+       _picker = picker ?? NativeComposerPhotoPicker(accountId: accountId),
        _processor = processor ?? const LocalPhotoProcessor(),
        _upload = upload ?? DioPhotoUploadTransport();
   final PostsApi api;
@@ -153,11 +153,15 @@ class ComposerController extends ChangeNotifier {
             ? ComposerStage.uncertain
             : ComposerStage.editing;
       }
-      final recovered = await _picker.recover();
-      if (recovered != null && !_publishSent && receipt == null) {
-        _source = recovered;
-        _invalidatePrepared();
-        await _persist();
+      try {
+        final recovered = await _picker.recover();
+        if (recovered != null && !_publishSent && receipt == null) {
+          _source = recovered;
+          _invalidatePrepared();
+          await _persist();
+        }
+      } catch (e) {
+        error = '$e';
       }
     } catch (e) {
       error = 'Không khôi phục được bản nháp: $e';
@@ -345,8 +349,8 @@ class ComposerController extends ChangeNotifier {
         clientRequestId: clientRequestId,
         uploadId: _session!.uploadId,
         media: _media!,
-        caption: _frozenCaption!,
-        filterApplied: _frozenFilter!,
+        caption: _frozenCaption ?? caption,
+        filterApplied: _frozenFilter ?? settings.filter.name,
       );
       receipt = post;
       stage = ComposerStage.published;
@@ -355,14 +359,26 @@ class ComposerController extends ChangeNotifier {
     } on _Cancelled {
       return null;
     } catch (e) {
-      // Only the first attempt can prove that no earlier ambiguous request committed.
-      if (!reconciling &&
-          _publishSent &&
+      // Only the first attempt can prove that no earlier ambiguous request committed,
+      // unless the server authoritatively confirms no post exists for clientRequestId
+      // and the upload session has expired or disappeared.
+      if (_publishSent &&
           receipt == null &&
           e is PostApiException &&
-          e.statusCode == 400 &&
-          e.code == 'VALIDATION_FAILED') {
+          ((!reconciling &&
+                  e.statusCode == 400 &&
+                  e.code == 'VALIDATION_FAILED') ||
+              const {
+                'UPLOAD_SESSION_NOT_FOUND',
+                'UPLOAD_NOT_FINALIZED',
+                'UPLOAD_SESSION_EXPIRED',
+              }.contains(e.code))) {
         _publishSent = false;
+        if (e.code != 'VALIDATION_FAILED') {
+          _session = null;
+          _media = null;
+          _uploaded = false;
+        }
       }
       stage = _publishSent ? ComposerStage.uncertain : ComposerStage.editing;
       error = _publishSent

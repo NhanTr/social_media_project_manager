@@ -2,6 +2,8 @@
 
 Date: 25 October 2026 (Asia/Ho_Chi_Minh).
 
+Follow-up: [28 October verification](sprint-s2-02-03-review-2026-10-28.md) records the later bug fixes, expanded suite, native simulator/emulator acceptance, and actual process-kill recovery. Its results supersede the earlier unexecuted simulator cases below; physical-device and staging boundaries remain explicit.
+
 Cards: [LC-S2-02](https://trello.com/c/SvmP4cq8), [LC-S2-03](https://trello.com/c/0fxRbH5Y).
 
 Implementation branch: `feature/LC-S2-02-LC-S2-03`, based on dev `0ba8cb6`.

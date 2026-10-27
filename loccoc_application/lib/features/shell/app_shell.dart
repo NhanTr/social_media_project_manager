@@ -35,7 +35,7 @@ class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
   final _feedKey = GlobalKey<FeedScreenState>();
   late final PostsApi _postsApi;
-  late final int? _accountId;
+  int? _accountId;
   Set<int>? _friendIds;
   late FriendsController _friendsController;
 
@@ -60,12 +60,28 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _sessionChanged() {
-    if (widget.authController.currentUser?.id == _accountId &&
+    final nextId = widget.authController.status == AuthStatus.authenticated
+        ? widget.authController.currentUser?.id
+        : null;
+    if (nextId == _accountId &&
         widget.authController.status == AuthStatus.authenticated) {
       return;
     }
     unawaited(_feedKey.currentState?.invalidateSession());
-    if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+    if (mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      if (nextId != _accountId) {
+        _friendsController.removeListener(_friendsChanged);
+        _friendsController.dispose();
+        _friendsController = FriendsController(
+          api: widget.authController.apiClient,
+        )..addListener(_friendsChanged);
+        setState(() {
+          _accountId = nextId;
+          _friendIds = null;
+        });
+      }
+    }
   }
 
   Future<void> _compose() async {
@@ -100,7 +116,7 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final screens = [
       _buildFeedTab(),
-      FriendsScreen(controller: _friendsController),
+      FriendsScreen(key: ValueKey(_accountId), controller: _friendsController),
       _buildChatTab(),
       ProfileScreen(authController: widget.authController),
     ];

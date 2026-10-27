@@ -21,6 +21,12 @@ class PostModel {
     required this.createdAt,
   });
 
+  /// Matches the server's cursor order: newest timestamp, then greatest ID.
+  int compareFeedPosition(PostModel other) {
+    final time = other.createdAt.compareTo(createdAt);
+    return time != 0 ? time : other.id.compareTo(id);
+  }
+
   factory PostModel.fromJson(Map<String, dynamic> json) {
     final author = json['author'] as Map<String, dynamic>?;
     return PostModel(

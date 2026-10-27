@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/storage/post_local_store.dart';
 import 'composer_image.dart';
@@ -13,8 +14,8 @@ abstract interface class ComposerDraftStore {
 }
 
 class LocalComposerDraftStore implements ComposerDraftStore {
-  LocalComposerDraftStore(int accountId)
-    : _store = PostLocalStore(accountId: accountId);
+  LocalComposerDraftStore(int accountId, {PostLocalStore? store})
+    : _store = store ?? PostLocalStore(accountId: accountId);
   final PostLocalStore _store;
   @override
   Future<Map<String, dynamic>?> read() => _store.read('composer');
@@ -31,9 +32,13 @@ abstract interface class ComposerPhotoPicker {
 }
 
 class NativeComposerPhotoPicker implements ComposerPhotoPicker {
-  NativeComposerPhotoPicker({ImagePicker? picker})
+  NativeComposerPhotoPicker({required this.accountId, ImagePicker? picker})
     : _picker = picker ?? ImagePicker();
+  final int accountId;
   final ImagePicker _picker;
+  static const recoveryOwnerKey = 'loccoc_native_picker_owner_v1';
+  bool get _android =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   Future<Uint8List> _read(XFile file) async {
     if (await file.length() > 30 * 1024 * 1024) {
       throw const PhotoException('Ảnh gốc quá lớn (tối đa 30 MiB).');
@@ -48,6 +53,17 @@ class NativeComposerPhotoPicker implements ComposerPhotoPicker {
         'Chụp ảnh chưa được hỗ trợ trên web. Hãy chọn ảnh từ thư viện.',
       );
     }
+    SharedPreferences? preferences;
+    String? owner;
+    if (_android) {
+      preferences = await SharedPreferences.getInstance();
+      owner = '$accountId:${DateTime.now().microsecondsSinceEpoch}';
+      if (!await preferences.setString(recoveryOwnerKey, owner)) {
+        throw const PhotoException(
+          'Không lưu được chủ sở hữu bản nháp. Vui lòng thử lại.',
+        );
+      }
+    }
     try {
       final file = await _picker.pickImage(
         source: camera ? ImageSource.camera : ImageSource.gallery,
@@ -56,23 +72,47 @@ class NativeComposerPhotoPicker implements ComposerPhotoPicker {
       return file == null ? null : await _read(file);
     } on PlatformException catch (e) {
       throw PhotoException(_permissionMessage(e));
+    } finally {
+      if (owner != null && preferences!.getString(recoveryOwnerKey) == owner) {
+        await preferences.remove(recoveryOwnerKey);
+      }
     }
   }
 
   @override
   Future<Uint8List?> recover() async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
-    final data = await _picker.retrieveLostData();
-    if (data.exception != null) {
-      throw PhotoException(_permissionMessage(data.exception!));
+    if (!_android) return null;
+    final preferences = await SharedPreferences.getInstance();
+    final owner = preferences.getString(recoveryOwnerKey);
+    final owned = owner?.split(':').first == '$accountId';
+    try {
+      final data = await _picker.retrieveLostData();
+      // Android's lost-data cache is app-global. Drain an unowned result without
+      // exposing or persisting its bytes under the currently signed-in account.
+      if (!owned) return null;
+      if (data.exception != null) {
+        throw PhotoException(_permissionMessage(data.exception!));
+      }
+      return data.files?.isNotEmpty == true
+          ? await _read(data.files!.first)
+          : null;
+    } on PlatformException catch (e) {
+      if (!owned) return null;
+      throw PhotoException(_permissionMessage(e));
+    } finally {
+      if (owned && preferences.getString(recoveryOwnerKey) == owner) {
+        await preferences.remove(recoveryOwnerKey);
+      }
     }
-    return data.files?.isNotEmpty == true ? _read(data.files!.first) : null;
   }
 
   String _permissionMessage(PlatformException error) {
-    if (error.code.toLowerCase().contains('access') ||
-        error.code.toLowerCase().contains('permission')) {
+    final code = error.code.toLowerCase();
+    if (code.contains('access') || code.contains('permission')) {
       return 'Quyền máy ảnh hoặc thư viện ảnh đã bị từ chối. Mở Cài đặt ứng dụng, cấp quyền rồi thử lại.';
+    }
+    if (code == 'no_available_camera') {
+      return 'Thiết bị không có máy ảnh khả dụng. Hãy chọn ảnh từ thư viện.';
     }
     return 'Không mở được ảnh. ${error.message ?? 'Vui lòng thử lại.'}';
   }

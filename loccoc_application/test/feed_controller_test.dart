@@ -101,6 +101,67 @@ void main() {
     controller.dispose();
   });
 
+  test(
+    'equal timestamps do not turn a post pushed to page two into a deletion',
+    () async {
+      api.onFeed = (_, _) async => page([2, 1], cursor: 'old');
+      await controller.refresh();
+      final older = controller.items.last;
+      api.onFeed = (_, cursor) async =>
+          cursor == null ? page([3, 2], cursor: 'next') : page([1]);
+      await controller.refresh();
+      expect(controller.canViewPost(older), isTrue);
+      await controller.loadMore();
+      expect(controller.items.map((p) => p.id), [3, 2, 1]);
+    },
+  );
+
+  test('preview cache write does not evict valid items beyond its twenty-post bound', () async {
+    api.onFeed = (_, _) async => page([1]);
+    await controller.setFriend(2);
+    api.onFeed = (_, _) async => page(List.generate(25, (i) => 25 - i));
+    await controller.setFriend(null);
+    expect(controller.canViewPost(post(1)), isTrue);
+    expect((await cache.read(2))!.posts.map((p) => p.id), [1]);
+    expect(controller.items.length, 25);
+  });
+
+  test(
+    'cache preserves a same-time post below the refreshed page boundary',
+    () async {
+      await cache.write(
+        2,
+        FeedSnapshot(posts: [post(1)], savedAt: DateTime.now()),
+      );
+      await cache.write(
+        null,
+        FeedSnapshot(posts: [post(2), post(1)], savedAt: DateTime.now()),
+        hasMore: true,
+      );
+      final evicted = await cache.write(
+        null,
+        FeedSnapshot(posts: [post(3), post(2)], savedAt: DateTime.now()),
+        hasMore: true,
+      );
+      expect(evicted, isEmpty);
+      expect((await cache.read(2))!.posts.single.id, 1);
+    },
+  );
+
+  test('partial refresh removes a newer missing post cached only in another filter', () async {
+    await cache.write(
+      2,
+      FeedSnapshot(posts: [post(9)], savedAt: DateTime.now()),
+    );
+    api.onFeed = (_, _) async => page([8, 7], cursor: 'more');
+    await controller.refresh();
+    expect(controller.canViewPost(post(9)), isFalse);
+    expect((await cache.read(2))!.posts, isEmpty);
+    api.onFeed = (_, _) async => throw Exception('offline');
+    await controller.setFriend(2);
+    expect(controller.items, isEmpty);
+  });
+
   test('filter switch ignores old network results and old errors', () async {
     final old = Completer<PostPage>();
     api.onFeed = (friend, _) =>
@@ -293,5 +354,28 @@ void main() {
     expect(latest.posts.length, lessThanOrEqualTo(20));
     final encoded = jsonEncode(store.values);
     expect(encoded.length, lessThan(3 * 1024 * 1024));
+  });
+  test('partial deletion in non-empty refresh evicts deleted post from other filter caches and revokes detail access', () async {
+    api.onFeed = (_, _) async =>
+        PostPage(items: [post(1, author: 2), post(2, author: 3)]);
+    await controller.refresh();
+    api.onFeed = (_, _) async => PostPage(items: [post(1, author: 2)]);
+    await controller.setFriend(2);
+    expect((await cache.read(null))!.posts.map((p) => p.id), [1, 2]);
+    expect((await cache.read(2))!.posts.map((p) => p.id), [1]);
+
+    // Post 1 is deleted on server while Post 2 from Friend 3 remains active.
+    api.onFeed = (friend, _) async =>
+        PostPage(items: friend == null ? [post(2, author: 3)] : []);
+    await controller.setFriend(null);
+    expect(controller.items.map((p) => p.id), [2]);
+    expect(controller.canViewPost(post(1, author: 2)), isFalse);
+    expect((await cache.read(2))!.posts, isEmpty);
+    expect((await cache.read(2))!.previews, isEmpty);
+
+    // Going offline and switching back to Friend 2 must not resurrect Post 1.
+    api.onFeed = (_, _) async => throw Exception('offline');
+    await controller.setFriend(2);
+    expect(controller.items, isEmpty);
   });
 }
