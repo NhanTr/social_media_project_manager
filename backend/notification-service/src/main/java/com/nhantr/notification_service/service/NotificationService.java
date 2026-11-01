@@ -40,8 +40,7 @@ public class NotificationService {
             DeviceTokenRepository tokens,
             PushNotificationProvider pushProvider,
             MockEmailAdapter emailAdapter,
-            NotificationDeliveryService deliveryService
-    ) {
+            NotificationDeliveryService deliveryService) {
         this.notifications = notifications;
         this.tokens = tokens;
         this.pushProvider = pushProvider;
@@ -120,8 +119,7 @@ public class NotificationService {
     public NotificationResponse create(
             Notification.Type type,
             NotificationEvent event,
-            String idempotencyKey
-    ) {
+            String idempotencyKey) {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             var existing = notifications.findByIdempotencyKey(idempotencyKey);
             if (existing.isPresent()) {
@@ -133,15 +131,13 @@ public class NotificationService {
         String body = event.body() == null ? defaultBody(type) : event.body();
         Notification saved = notifications.save(new Notification(
                 event.userId(), event.actorUserId(), type, event.referenceId(),
-                title, body, idempotencyKey
-        ));
+                title, body, idempotencyKey));
 
         // Push to active device tokens
         List<DeviceToken> activeTokens = tokens.findByUserIdAndActiveTrue(event.userId());
         for (DeviceToken token : activeTokens) {
             PushNotificationPayload payload = PushNotificationPayload.of(
-                    token.getToken(), title, body, type.name(), event.referenceId()
-            );
+                    token.getToken(), title, body, type.name(), event.referenceId());
             PushDeliveryResult result = pushProvider.send(payload);
             if (!result.success() && result.retryable() && deliveryService != null) {
                 var delivery = deliveryService.schedulePushDelivery(saved.getId(), token.getToken(), 3);
@@ -179,8 +175,7 @@ public class NotificationService {
     public record DeviceTokenRequest(
             @NotBlank @Size(max = 4096) String token,
             @NotNull DeviceToken.Platform platform,
-            @Size(max = 4096) String oldToken
-    ) {
+            @Size(max = 4096) String oldToken) {
         public DeviceTokenRequest(String token, DeviceToken.Platform platform) {
             this(token, platform, null);
         }
@@ -188,7 +183,8 @@ public class NotificationService {
 
     public record DeviceTokenResponse(Long id, String token, String platform, boolean active) {
         static DeviceTokenResponse from(DeviceToken token) {
-            return new DeviceTokenResponse(token.getId(), token.getToken(), token.getPlatform().name(), token.isActive());
+            return new DeviceTokenResponse(token.getId(), token.getToken(), token.getPlatform().name(),
+                    token.isActive());
         }
     }
 
@@ -197,24 +193,23 @@ public class NotificationService {
             Long actorUserId,
             Long referenceId,
             @Size(max = 255) String title,
-            @Size(max = 2000) String body
-    ) {}
+            @Size(max = 2000) String body) {
+    }
 
     public record NotificationResponse(
             Long id, Long userId, Long actorUserId, String type, Long referenceId,
-            String title, String body, boolean read, Instant createdAt, Instant readAt
-    ) {
+            String title, String body, boolean read, Instant createdAt, Instant readAt) {
         static NotificationResponse from(Notification n) {
             return new NotificationResponse(
                     n.getId(), n.getUserId(), n.getActorUserId(), n.getType().name(), n.getReferenceId(),
-                    n.getTitle(), n.getBody(), n.isRead(), n.getCreatedAt(), n.getReadAt()
-            );
+                    n.getTitle(), n.getBody(), n.isRead(), n.getCreatedAt(), n.getReadAt());
         }
     }
 
     private record Cursor(Instant time, Long id) {
         static Cursor parse(String value) {
-            if (value == null || value.isBlank()) return new Cursor(null, Long.MAX_VALUE);
+            if (value == null || value.isBlank())
+                return new Cursor(null, Long.MAX_VALUE);
             try {
                 String[] parts = new String(Base64.getUrlDecoder().decode(value)).split(":", 2);
                 return new Cursor(Instant.ofEpochMilli(Long.parseLong(parts[0])), Long.parseLong(parts[1]));
@@ -222,7 +217,11 @@ public class NotificationService {
                 throw ApiException.badRequest("CURSOR_INVALID", "Cursor is invalid.");
             }
         }
-        static Cursor of(Notification n) { return new Cursor(n.getCreatedAt(), n.getId()); }
+
+        static Cursor of(Notification n) {
+            return new Cursor(n.getCreatedAt(), n.getId());
+        }
+
         String encode() {
             return Base64.getUrlEncoder().withoutPadding().encodeToString((time.toEpochMilli() + ":" + id).getBytes());
         }
