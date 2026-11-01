@@ -86,3 +86,4 @@ mvn test -pl notification-service
 - [x] **Test evidence:** Đầy đủ bằng chứng nghiệm thu 4 tiêu chí cốt lõi trong báo cáo này.
 - [x] **Docs/OpenAPI cập nhật:** Đã cập nhật `backend/docs/03-api-catalog.md` với đầy đủ các endpoint mới và contract.
 - [x] **Không còn lỗi P0/P1:** 100% checklist và acceptance criteria của LC-S3-03 đã hoàn thành.
+
