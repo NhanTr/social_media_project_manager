@@ -14,6 +14,11 @@ public class NotificationClient {
     private final RestClient client;
     private final String internalApiKey;
 
+    protected NotificationClient() {
+        this.client = null;
+        this.internalApiKey = null;
+    }
+
     public NotificationClient(
             @Value("${clients.notification.base-url}") String baseUrl,
             @Value("${app.internal-api-key}") String internalApiKey

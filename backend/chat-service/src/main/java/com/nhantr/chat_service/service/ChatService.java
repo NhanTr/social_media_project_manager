@@ -6,11 +6,14 @@ import com.nhantr.chat_service.entity.Conversation;
 import com.nhantr.chat_service.entity.Message;
 import com.nhantr.chat_service.repository.ConversationRepository;
 import com.nhantr.chat_service.repository.MessageRepository;
+import com.nhantr.chat_service.websocket.ChatReceiptEvent;
 import com.nhantr.chat_service.websocket.PresenceRegistry;
 import com.nhantr.common.api.ApiException;
 import com.nhantr.common.api.PageResponse;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -22,6 +25,8 @@ import java.util.List;
 
 @Service
 public class ChatService {
+    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
+
     private final ConversationRepository conversations;
     private final MessageRepository messages;
     private final SocialClient social;
@@ -79,25 +84,62 @@ public class ChatService {
         Long receiverId = conversation.other(senderId);
         requireChatAllowed(senderId, receiverId);
         validatePayload(request);
+
+        // Idempotency: If clientMessageId was provided and already exists, suppress duplication
+        if (request.clientMessageId() != null && !request.clientMessageId().isBlank()) {
+            var existing = messages.findByConversationIdAndSenderIdAndClientMessageId(
+                    conversation.getId(), senderId, request.clientMessageId()
+            );
+            if (existing.isPresent()) {
+                log.info("Duplicate chat message suppressed via clientMessageId={}", request.clientMessageId());
+                return MessageResponse.from(existing.get());
+            }
+        }
+
         boolean online = presence.isOnline(receiverId);
         Message message = messages.save(new Message(
-                conversation.getId(), senderId, normalize(request.content()), request.mediaUrl(),
-                request.thumbnailUrl(), request.messageType(), online
+                conversation.getId(), senderId, request.clientMessageId(), normalize(request.content()),
+                request.mediaUrl(), request.thumbnailUrl(), request.messageType(), online
         ));
         conversation.touch();
         conversations.save(conversation);
+
         MessageResponse response = MessageResponse.from(message);
         messaging.convertAndSend("/topic/conversations/" + conversation.getId(), response);
+
         if (!online) {
             notifications.chatMessage(receiverId, senderId, message.getId(), preview(request));
         }
+
         return response;
+    }
+
+    @Transactional
+    public int markDelivered(Long userId, Long conversationId) {
+        ownedConversation(userId, conversationId);
+        Instant now = Instant.now();
+        int updated = messages.markDelivered(conversationId, userId, Message.Status.DELIVERED, now);
+        if (updated > 0) {
+            messaging.convertAndSend(
+                    "/topic/conversations/" + conversationId,
+                    new ChatReceiptEvent(conversationId, userId, "DELIVERED", now, updated)
+            );
+        }
+        return updated;
     }
 
     @Transactional
     public int markRead(Long userId, Long conversationId) {
         ownedConversation(userId, conversationId);
-        return messages.markRead(conversationId, userId, Message.Status.READ, Instant.now());
+        Instant now = Instant.now();
+        int updated = messages.markRead(conversationId, userId, Message.Status.READ, now);
+        if (updated > 0) {
+            messaging.convertAndSend(
+                    "/topic/conversations/" + conversationId,
+                    new ChatReceiptEvent(conversationId, userId, "READ", now, updated)
+            );
+        }
+        return updated;
     }
 
     private Conversation ownedConversation(Long userId, Long conversationId) {
@@ -129,6 +171,7 @@ public class ChatService {
     }
 
     private String normalize(String value) { return value == null ? null : value.trim(); }
+
     private String preview(SendMessageRequest request) {
         if (request.content() == null) return "Sent you media.";
         return request.content().length() > 120 ? request.content().substring(0, 120) : request.content();
@@ -137,10 +180,15 @@ public class ChatService {
     public record SendMessageRequest(
             @NotNull Long conversationId,
             @NotNull Message.Type messageType,
+            @Size(max = 100) String clientMessageId,
             @Size(max = 5000) String content,
             @Size(max = 2048) String mediaUrl,
             @Size(max = 2048) String thumbnailUrl
-    ) {}
+    ) {
+        public SendMessageRequest(Long conversationId, Message.Type messageType, String content, String mediaUrl, String thumbnailUrl) {
+            this(conversationId, messageType, null, content, mediaUrl, thumbnailUrl);
+        }
+    }
 
     public record ConversationResponse(Long id, Long userId1, Long userId2, Instant lastMessageAt, Instant createdAt) {
         static ConversationResponse from(Conversation c) {
@@ -149,15 +197,15 @@ public class ChatService {
     }
 
     public record MessageResponse(
-            Long id, Long conversationId, Long senderId, String content, String mediaUrl,
-            String thumbnailUrl, String messageType, String status, Instant sentAt,
+            Long id, Long conversationId, Long senderId, String clientMessageId, String content,
+            String mediaUrl, String thumbnailUrl, String messageType, String status, Instant sentAt,
             Instant deliveredAt, Instant readAt
     ) {
         static MessageResponse from(Message m) {
             return new MessageResponse(
-                    m.getId(), m.getConversationId(), m.getSenderId(), m.getContent(), m.getMediaUrl(),
-                    m.getThumbnailUrl(), m.getMessageType().name(), m.getStatus().name(), m.getSentAt(),
-                    m.getDeliveredAt(), m.getReadAt()
+                    m.getId(), m.getConversationId(), m.getSenderId(), m.getClientMessageId(), m.getContent(),
+                    m.getMediaUrl(), m.getThumbnailUrl(), m.getMessageType().name(), m.getStatus().name(),
+                    m.getSentAt(), m.getDeliveredAt(), m.getReadAt()
             );
         }
     }

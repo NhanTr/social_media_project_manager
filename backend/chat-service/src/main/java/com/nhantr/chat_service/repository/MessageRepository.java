@@ -9,8 +9,14 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 public interface MessageRepository extends JpaRepository<Message, Long> {
+
+    Optional<Message> findByConversationIdAndSenderIdAndClientMessageId(
+            Long conversationId, Long senderId, String clientMessageId
+    );
+
     List<Message> findByConversationIdOrderBySentAtDescIdDesc(Long conversationId, Pageable pageable);
 
     @Query("""
@@ -28,7 +34,21 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     @Modifying
     @Query("""
-            update Message m set m.status = :readStatus, m.readAt = :now
+            update Message m set m.status = :deliveredStatus, m.deliveredAt = :now
+            where m.conversationId = :conversationId and m.senderId <> :receiverId
+              and m.status = 'SENT'
+            """)
+    int markDelivered(
+            @Param("conversationId") Long conversationId,
+            @Param("receiverId") Long receiverId,
+            @Param("deliveredStatus") Message.Status deliveredStatus,
+            @Param("now") Instant now
+    );
+
+    @Modifying
+    @Query("""
+            update Message m set m.status = :readStatus, m.readAt = :now,
+                   m.deliveredAt = case when m.deliveredAt is null then :now else m.deliveredAt end
             where m.conversationId = :conversationId and m.senderId <> :readerId
               and m.status <> :readStatus
             """)
