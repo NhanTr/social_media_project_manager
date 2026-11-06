@@ -3,17 +3,24 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
-Future<Directory> _directory(int accountId, String? root) async {
+Future<Directory> _directory(
+  int accountId,
+  String? root,
+  String namespace,
+) async {
   final base = root ?? (await getApplicationSupportDirectory()).path;
-  return Directory('$base/loccoc-posts/account-$accountId');
+  return Directory('$base/loccoc-$namespace/account-$accountId');
 }
 
 Future<Map<String, dynamic>?> read(
   int accountId,
   String key,
   String? root,
+  String namespace,
 ) async {
-  final file = File('${(await _directory(accountId, root)).path}/$key.json');
+  final file = File(
+    '${(await _directory(accountId, root, namespace)).path}/$key.json',
+  );
   if (!await file.exists()) return null;
   try {
     return jsonDecode(await file.readAsString()) as Map<String, dynamic>;
@@ -29,8 +36,9 @@ Future<void> write(
   String key,
   Map<String, dynamic> value,
   String? root,
+  String namespace,
 ) async {
-  final dir = await _directory(accountId, root);
+  final dir = await _directory(accountId, root, namespace);
   await dir.create(recursive: true);
   final file = File('${dir.path}/$key.json');
   final pending = File('${file.path}.pending');
@@ -38,15 +46,20 @@ Future<void> write(
   await pending.rename(file.path);
 }
 
-Future<void> remove(int accountId, String key, String? root) async {
-  final dir = await _directory(accountId, root);
+Future<void> remove(
+  int accountId,
+  String key,
+  String? root,
+  String namespace,
+) async {
+  final dir = await _directory(accountId, root, namespace);
   for (final suffix in ['.json', '.json.pending']) {
     final file = File('${dir.path}/$key$suffix');
     if (await file.exists()) await file.delete();
   }
 }
 
-Future<void> clear(int accountId, String? root) async {
-  final dir = await _directory(accountId, root);
+Future<void> clear(int accountId, String? root, String namespace) async {
+  final dir = await _directory(accountId, root, namespace);
   if (await dir.exists()) await dir.delete(recursive: true);
 }

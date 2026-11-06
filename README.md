@@ -81,3 +81,13 @@ python3 scripts/validate_environment_config.py \
 Xem [hướng dẫn nghiệm thu](docs/sprint-0-1-acceptance-review.md) và
 [báo cáo bổ sung](docs/sprint-0-1-followup.md). Các kết quả kiểm tra có thời điểm;
 không diễn giải inventory cũ là xác nhận trạng thái hiện tại.
+
+## Flutter S3: chat và notification preview
+
+S3-02/S3-04 có repository mô phỏng tách biệt, dùng khi backend đang hoàn thiện.
+Trong `loccoc_application`, chạy `flutter run -t lib/s3_demo.dart --dart-define=APP_ENV=dev`
+để xem chat/offline queue/inbox/deep link mà không cần backend login. App chính
+cũng bật bản xem trước ở dev sau đăng nhập; truyền `--dart-define=S3_DEMO=false`
+để tắt. Staging/prod không tự sử dụng dữ liệu mô phỏng.
+
+Xem [cách nghiệm thu và nối backend](docs/sprint-s3-02-04-acceptance.md).
