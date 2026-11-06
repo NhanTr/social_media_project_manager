@@ -82,12 +82,26 @@ Xem [hướng dẫn nghiệm thu](docs/sprint-0-1-acceptance-review.md) và
 [báo cáo bổ sung](docs/sprint-0-1-followup.md). Các kết quả kiểm tra có thời điểm;
 không diễn giải inventory cũ là xác nhận trạng thái hiện tại.
 
-## Flutter S3: chat và notification preview
+## Flutter S3: giao diện Android/iOS
 
-S3-02/S3-04 có repository mô phỏng tách biệt, dùng khi backend đang hoàn thiện.
-Trong `loccoc_application`, chạy `flutter run -t lib/s3_demo.dart --dart-define=APP_ENV=dev`
-để xem chat/offline queue/inbox/deep link mà không cần backend login. App chính
-cũng bật bản xem trước ở dev sau đăng nhập; truyền `--dart-define=S3_DEMO=false`
-để tắt. Staging/prod không tự sử dụng dữ liệu mô phỏng.
+S3-02/S3-04 là màn hình trong app Flutter tại `loccoc_application/`.
+Chat và notification đã tích hợp vào app chính; repository mô phỏng được dùng
+khi backend đang hoàn thiện. Chạy trên điện thoại/emulator:
+
+```sh
+cd loccoc_application
+flutter devices
+flutter run -d <android-or-ios-device-id> --dart-define=APP_ENV=dev
+```
+
+Để xem riêng S3 trên thiết bị khi chưa có backend đăng nhập:
+
+```sh
+flutter run -d <android-or-ios-device-id> -t lib/s3_demo.dart --dart-define=APP_ENV=dev
+```
+
+Ứng dụng chính bật dữ liệu S3 mô phỏng ở dev sau đăng nhập; truyền
+`--dart-define=S3_DEMO=false` để tắt. Staging/prod không tự dùng dữ liệu mô phỏng.
+Bản web chỉ là công cụ kiểm tra phụ; đầu ra chính là app Android/iOS.
 
 Xem [cách nghiệm thu và nối backend](docs/sprint-s3-02-04-acceptance.md).

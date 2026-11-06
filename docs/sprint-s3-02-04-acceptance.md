@@ -8,7 +8,8 @@ Trong `loccoc_application`:
 
 ```sh
 flutter pub get
-flutter run -t lib/s3_demo.dart --dart-define=APP_ENV=dev
+flutter devices
+flutter run -d <android-or-ios-device-id> -t lib/s3_demo.dart --dart-define=APP_ENV=dev
 ```
 
 Entry riêng này mở chat + inbox mà không cần auth/backend; không có auth bypass trong ứng dụng chính. Chỉ chạy với APP_ENV=dev. Ứng dụng chính (`lib/main.dart`) sau đăng nhập ở môi trường dev cũng tích hợp S3, có header “Dữ liệu mô phỏng”, nút thông báo/badge và chat thay placeholder. `--dart-define=S3_DEMO=false` tắt demo trong ứng dụng chính. Staging/prod không tự tạo repository mô phỏng.
@@ -58,3 +59,20 @@ Các test mới bao gồm: durable queue/server restart, mất ACK, reconnect đ
 ## Phạm vi nghiệm thu còn cần backend/thiết bị
 
 Frontend dùng fake transport có lưu bền vững, không có production HTTP/STOMP/FCM/APNs adapter. Airplane-mode với transport thật, hai-client qua Gateway, token refresh/rotation/logout disable, PostgreSQL dedup đồng thời, OS cold-start push, Android/iOS real-device performance và provider config phải nghiệm thu khi backend đã tích hợp. Không coi demo/repository tests là bằng chứng những bước đó đã chạy.
+
+## Xác minh native bổ sung — 06/11/2026
+
+Người dùng xác nhận ưu tiên giao diện app Android/iOS. Các màn hình là Flutter
+widgets trong app chính, dùng cùng code cho hai nền tảng. Native là cách chạy
+và nghiệm thu chính; web preview trước đó là kiểm tra phụ.
+
+- `flutter build ios --simulator --debug -t lib/s3_demo.dart`: PASS,
+  `build/ios/iphonesimulator/Runner.app`.
+- `flutter run -d 72019E70-57C1-4A91-8125-3E5B1CE6B876 -t lib/s3_demo.dart --no-resident`:
+  PASS, cài và mở trên iPhone 17 simulator / iOS 27.0; screenshot xác nhận app
+  render chat list, unread badge và tab chat/notification trong giao diện iPhone.
+- `flutter build ios --simulator --debug` (entry `lib/main.dart`): PASS,
+  `build/ios/iphonesimulator/Runner.app`. Không thay auth flow của app chính
+  để chạy bản xem trước khi backend chưa sẵn sàng.
+- Chưa chạy Android hoặc smoke tương tác native đầy đủ trong lần bổ sung này;
+  không dùng build iOS làm bằng chứng Android đã được nghiệm thu.
