@@ -27,3 +27,8 @@ Bộ tài liệu này được tổng hợp từ thiết kế LocCoc trên Notio
 - [Thiết kế API Gateway](https://app.notion.com/p/39a7b662e4cd80d789d2e440404c17e7)
 
 > Khi tài liệu Notion và code khác nhau, bộ tài liệu này mô tả code hiện tại trước, sau đó ghi phần cần bổ sung riêng.
+
+## Contract bổ sung theo sprint
+
+- [S3-02 / S3-04: hiện trạng và API contract bàn giao](contracts/s3-mobile-api-contract.md) — rà soát 06/11/2026; phân biệt dev, nhánh chưa merge và đề xuất.
+- [OpenAPI đích S3 mobile (draft)](contracts/s3-mobile.openapi.json) — chưa phải bằng chứng runtime đã triển khai.

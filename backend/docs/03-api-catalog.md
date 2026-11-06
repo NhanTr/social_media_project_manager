@@ -339,3 +339,7 @@ Caller nên gửi `Idempotency-Key` ổn định theo domain event để tránh 
 - Refresh dùng Redis GETDEL để chỉ một request đồng thời tiêu thụ được refresh token cũ. Logout thu hồi refresh token; access token hiện còn hiệu lực đến expiry.
 - Search relationship trả `friend`, `blocked`, `pendingRequestId`.
 - Hủy lời mời yêu cầu migration V3, chỉ sender được hủy PENDING; retry CANCELLED trả cùng kết quả. Accept/decline/cancel khóa hàng request trong transaction.
+
+## Rà soát S3-02 / S3-04 — 06/11/2026
+
+Xem [contract bàn giao](contracts/s3-mobile-api-contract.md) và [OpenAPI đích (draft)](contracts/s3-mobile.openapi.json) cho clientMessageId, receipt, unread count và typed notification target. Mốc dev là eefc3a5; chat b8e6cb4 và notification 0d17536 chưa merge. Các phần bổ sung đề xuất chưa có hiệu lực runtime. Giới hạn history trên nhánh chat là 100, notification là 50; không áp dụng mô tả “tối đa 50” chung ở trên cho mọi endpoint.
