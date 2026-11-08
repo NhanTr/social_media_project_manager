@@ -76,3 +76,16 @@ và nghiệm thu chính; web preview trước đó là kiểm tra phụ.
   để chạy bản xem trước khi backend chưa sẵn sàng.
 - Chưa chạy Android hoặc smoke tương tác native đầy đủ trong lần bổ sung này;
   không dùng build iOS làm bằng chứng Android đã được nghiệm thu.
+
+## Nghiệm thu để chuyển Review — 08/11/2026
+
+Đã chạy lại 168 unit/widget tests với coverage, analyzer và format; đều PASS.
+Bổ sung `integration_test/s3_native_acceptance_test.dart`, chạy PASS trực tiếp
+trên iPhone 17 / iOS 27.0 với filesystem thật: queue offline và tái tạo session,
+canonical replay, inbox/badge, foreground banner, typed target/fallback và
+permission explanation. Bằng chứng này dành cho Flutter/mock; không thay cho
+nghiệm thu backend hoặc OS push thật.
+
+Xem [báo cáo Review ngày 08/11](sprint-s3-02-04-review-2026-11-08.md) cho phạm vi,
+command, kết quả và các điều kiện còn chờ. Hai lỗi P2 cũ được re-review xác nhận
+đã sửa; handoff Review & QA không đồng nghĩa chuyển Done.

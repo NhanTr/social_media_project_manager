@@ -430,7 +430,10 @@ class ChatController extends ChangeNotifier {
       );
     } else if (event is ReceiptEvent) {
       if (event.participantId == accountId ||
-          ![MessageStatus.delivered, MessageStatus.read].contains(event.status)) {
+          ![
+            MessageStatus.delivered,
+            MessageStatus.read,
+          ].contains(event.status)) {
         return;
       }
       if (event.lastMessageId == null) {
@@ -510,7 +513,8 @@ class ChatController extends ChangeNotifier {
           ..sort(compareMessages);
     if (incoming.isEmpty) return;
     final newest = incoming.last;
-    if (_delivered[id] != null && compareMessages(newest, _delivered[id]!) <= 0) {
+    if (_delivered[id] != null &&
+        compareMessages(newest, _delivered[id]!) <= 0) {
       return;
     }
     await repository.delivered(id, newest.id!);
