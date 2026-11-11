@@ -197,11 +197,12 @@ Publication retry contract (S2-02):
 
 | Method | Path | Auth | Input | Kết quả |
 | --- | --- | --- | --- | --- |
-| POST | `/api/v1/device-tokens` | User | `{token, platform}` | `201`, device token |
+| POST | `/api/v1/device-tokens` | User | `{token, platform, oldToken?}` | `201`, device token (hỗ trợ xoay vòng `oldToken`) |
 | DELETE | `/api/v1/device-tokens/{token}` | User | path token | `204` |
 | GET | `/api/v1/notifications?cursor=&limit=20` | User | cursor | Page notification |
+| GET | `/api/v1/notifications/unread-count` | User | — | `{"count": <number>}` |
 | POST | `/api/v1/notifications/{id}/read` | User | — | Notification đã đọc |
-| POST | `/api/v1/notifications/read-all` | User | — | `{updated}` |
+| POST | `/api/v1/notifications/read-all` | User | — | `{"updated": <number>}` |
 
 `platform`: `IOS`, `ANDROID`, `WEB`.
 
@@ -316,6 +317,8 @@ Tất cả endpoint dưới đây yêu cầu `X-Internal-Api-Key` và không đi
 | POST | `/internal/v1/notifications/new-post` | post |
 | POST | `/internal/v1/notifications/chat-message` | chat |
 | POST | `/internal/v1/notifications/report-result` | moderation |
+| POST | `/internal/v1/device-tokens/disable-user/{userId}` | identity, gateway |
+| POST | `/internal/v1/emails/send` | auth, subscription |
 
 Notification event:
 

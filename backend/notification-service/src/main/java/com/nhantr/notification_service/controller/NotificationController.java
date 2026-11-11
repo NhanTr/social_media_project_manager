@@ -40,6 +40,11 @@ public class NotificationController {
         return service.list(user.id(), cursor, limit);
     }
 
+    @GetMapping("/api/v1/notifications/unread-count")
+    public UnreadCountResponse unreadCount(@AuthenticationPrincipal CurrentUser user) {
+        return new UnreadCountResponse(service.getUnreadCount(user.id()));
+    }
+
     @PostMapping("/api/v1/notifications/{id}/read")
     public NotificationService.NotificationResponse read(
             @AuthenticationPrincipal CurrentUser user,
@@ -54,4 +59,5 @@ public class NotificationController {
     }
 
     public record ReadAllResponse(int updated) {}
+    public record UnreadCountResponse(long count) {}
 }
