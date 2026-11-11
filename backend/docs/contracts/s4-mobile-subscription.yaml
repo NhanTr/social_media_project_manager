@@ -1,0 +1,136 @@
+openapi: 3.0.3
+info:
+  title: LocCoc S4 mobile subscription contract (PROPOSED)
+  version: 0.1.0-draft
+  description: Mobile integration proposal for LC-S4-03. Subscription/payment endpoints are NOT implemented in origin/dev ea52c38; requires LC-S4-01/02. Existing AI endpoints are documented separately in the API catalog.
+x-contract-status: proposed-not-implemented
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/subscriptions/plans:
+    get:
+      operationId: listSubscriptionPlans
+      responses:
+        '200':
+          description: Exactly one FREE and one PLUS; server formatted prices. Sandbox only in mobile v0.1.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    minItems: 2
+                    maxItems: 2
+                    items: {$ref: '#/components/schemas/Plan'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/subscriptions/me:
+    get:
+      operationId: getMySubscription
+      responses:
+        '200':
+          description: JWT-scoped authoritative snapshot; Cache-Control no-store. validUntil must not exceed grant expiry.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snapshot'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/subscriptions/checkout:
+    post:
+      operationId: createSandboxCheckout
+      description: Atomically deduplicate by JWT user and clientRequestId, replay same session; enforce one pending checkout per user/tier, including after restart. Only verified webhooks grant entitlement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tier, clientRequestId]
+              properties:
+                tier: {type: string, enum: [PLUS]}
+                clientRequestId: {type: string, format: uuid}
+      responses:
+        '201':
+          description: Sandbox session created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Checkout'}
+        '200':
+          description: Idempotent replay or current pending session
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Checkout'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/subscriptions/me/cancel:
+    post:
+      operationId: cancelMySubscriptionAtPeriodEnd
+      description: Idempotently schedule end-of-period cancellation; mobile reloads authoritative account state.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cancelAtPeriodEnd]
+              properties:
+                cancelAtPeriodEnd: {type: boolean, enum: [true]}
+      responses:
+        '200': {description: Scheduled}
+        '202': {description: Accepted; refresh account snapshot}
+        '204': {description: Scheduled with no content}
+        default: {$ref: '#/components/responses/Problem'}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  responses:
+    Problem:
+      description: Existing ProblemDetail; 400 validation, 401 authentication, 403 authorization or Terms, 409 conflict, 410 checkout expired, 429 rate limit, 503 dependency unavailable.
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [status, code]
+            properties:
+              status: {type: integer}
+              code: {type: string}
+              detail: {type: string}
+              requestId: {type: string}
+  schemas:
+    Plan:
+      type: object
+      required: [tier, name, priceLabel, sandbox, checkoutEnabled, benefits]
+      properties:
+        tier: {type: string, enum: [FREE, PLUS]}
+        name: {type: string, minLength: 1}
+        priceLabel: {type: string, minLength: 1}
+        sandbox: {type: boolean}
+        checkoutEnabled: {type: boolean}
+        benefits:
+          type: array
+          items: {type: string, minLength: 1}
+    Snapshot:
+      type: object
+      required: [tier, status, paymentStatus, paymentSessionId, cancelAtPeriodEnd, currentPeriodEnd, validUntil, entitlements]
+      properties:
+        tier: {type: string, enum: [FREE, PLUS]}
+        status: {type: string, enum: [ACTIVE, GRACE, PAST_DUE, CANCELED, EXPIRED, INCOMPLETE]}
+        paymentStatus: {type: string, enum: [NONE, PENDING, SUCCEEDED, FAILED]}
+        paymentSessionId: {type: string, minLength: 1, nullable: true, description: Required correlation for payment status other than NONE}
+        cancelAtPeriodEnd: {type: boolean}
+        currentPeriodEnd: {type: string, format: date-time, nullable: true}
+        validUntil: {type: string, format: date-time}
+        entitlements:
+          type: object
+          required: [aiGeneration]
+          properties:
+            aiGeneration: {type: boolean}
+    Checkout:
+      type: object
+      required: [sessionId, url, sandbox, expiresAt]
+      properties:
+        sessionId: {type: string, minLength: 1}
+        url: {type: string, format: uri, pattern: '^https://', description: Server controlled sandbox provider URL with no userinfo}
+        sandbox: {type: boolean, enum: [true]}
+        expiresAt: {type: string, format: date-time}
