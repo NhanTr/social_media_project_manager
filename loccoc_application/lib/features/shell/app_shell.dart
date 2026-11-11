@@ -12,10 +12,20 @@ import '../feed/feed_controller.dart';
 import '../friends/friends_controller.dart';
 import '../friends/screens/friends_screen.dart';
 import '../profile/screens/profile_screen.dart';
+import '../../core/config/app_config.dart';
+import '../chat/chat_screen.dart';
+import '../notifications/notification_center_screen.dart';
+import '../s3/notification_launch_controller.dart';
+import '../s3/notification_banner_overlay.dart';
+import '../s3/s3_session.dart';
+import '../s3/s3_target_screen.dart';
+import '../feed/media_detail_screen.dart';
 
 class AppShell extends StatefulWidget {
   final AuthController authController;
 
+  final S3Session? Function(int accountId)? s3SessionFactory;
+  final NotificationLaunchController? notificationLaunches;
   final PostsApi? postsApi;
   final FeedController? feedController;
   final Widget Function(PostsApi api, int accountId)? composerBuilder;
@@ -23,6 +33,8 @@ class AppShell extends StatefulWidget {
     super.key,
     required this.authController,
     this.postsApi,
+    this.s3SessionFactory,
+    this.notificationLaunches,
     this.feedController,
     this.composerBuilder,
   });
@@ -31,13 +43,19 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   final _feedKey = GlobalKey<FeedScreenState>();
   late final PostsApi _postsApi;
   int? _accountId;
   Set<int>? _friendIds;
   late FriendsController _friendsController;
+  S3Session? _s3;
+  NotificationBannerOverlay? _bannerOverlay;
+  late final NotificationLaunchController _launches;
+  bool _s3Ready = false;
+  bool _launchScheduled = false;
+  bool _foreground = true;
 
   @override
   void initState() {
@@ -49,6 +67,141 @@ class _AppShellState extends State<AppShell> {
     );
     _friendsController.addListener(_friendsChanged);
     widget.authController.addListener(_sessionChanged);
+    WidgetsBinding.instance.addObserver(this);
+    _foreground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    _launches = widget.notificationLaunches ?? NotificationLaunchController();
+    _launches.addListener(_scheduleLaunch);
+    _createS3();
+  }
+
+  void _createS3() {
+    final id = _accountId;
+    _s3Ready = false;
+    if (id == null || id <= 0) return;
+    _s3 = widget.s3SessionFactory != null
+        ? widget.s3SessionFactory!(id)
+        : S3Session.forEnvironment(
+            accountId: id,
+            environment: AppConfig.environment,
+            demoEnabled: const bool.fromEnvironment(
+              'S3_DEMO',
+              defaultValue: true,
+            ),
+          );
+    final session = _s3;
+    if (session == null) return;
+    session.chat.setForeground(_foreground);
+    session.notifications.addListener(_notificationsChanged);
+    unawaited(_initializeS3(session));
+  }
+
+  Future<void> _initializeS3(S3Session session) async {
+    try {
+      await session.initialize();
+    } catch (_) {
+      // Domain controllers retain loading/storage errors and offer retry.
+    }
+    if (!mounted || !identical(session, _s3)) return;
+    _bannerOverlay = NotificationBannerOverlay(
+      controller: session.notifications,
+      onOpen: _openTarget,
+    )..attach(Navigator.of(context).overlay!);
+    _bannerOverlay!.setForeground(_foreground);
+    setState(() => _s3Ready = true);
+    _scheduleLaunch();
+  }
+
+  void _notificationsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _disposeS3() {
+    _bannerOverlay?.dispose();
+    _bannerOverlay = null;
+    _s3?.notifications.removeListener(_notificationsChanged);
+    _s3?.dispose();
+    _s3 = null;
+    _s3Ready = false;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _s3?.chat.setForeground(_foreground);
+    _bannerOverlay?.setForeground(_foreground);
+    if (_foreground) {
+      unawaited(_s3?.notifications.refresh());
+      _scheduleLaunch();
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _scheduleLaunch() {
+    if (!_s3Ready || !_foreground || _launchScheduled || !mounted) return;
+    _launchScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _launchScheduled = false;
+      if (!mounted || !_s3Ready || !_foreground) return;
+      final id = _accountId;
+      if (id == null) return;
+      final launch = _launches.takeForAccount(id);
+      if (launch != null) {
+        final notificationId = launch.notificationId;
+        if (notificationId != null) {
+          unawaited(_s3?.notifications.markReadById(notificationId));
+        }
+        unawaited(_openTarget(launch.target));
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  Future<void> _openTarget(NotificationTarget target) async {
+    final session = _s3;
+    if (!mounted || session == null || session.accountId != _accountId) return;
+    Widget destination;
+    if (target.kind == NotificationTargetKind.conversation &&
+        target.id != null) {
+      destination = ChatRoomScreen(
+        controller: session.chat,
+        conversationId: target.id!,
+        focusMessageId: target.messageId,
+      );
+    } else if (session.isDemo) {
+      destination = S3DemoTargetScreen(target: target);
+    } else if (target.kind == NotificationTargetKind.post &&
+        target.id != null) {
+      final account = _accountId;
+      destination = MediaDetailScreen(
+        api: _postsApi,
+        postId: target.id!,
+        onUnavailable: (_) {},
+        isSessionActive: () => mounted && account == _accountId,
+        accessChanges: widget.authController,
+      );
+    } else {
+      destination = const S3UnavailableTargetScreen();
+    }
+    await Navigator.of(context)
+        .push<void>(MaterialPageRoute(builder: (_) => destination));
+  }
+
+  Future<void> _openNotifications() async {
+    final session = _s3;
+    if (session == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Thông báo')),
+          body: NotificationCenterScreen(
+            controller: session.notifications,
+            onOpen: _openTarget,
+          ),
+        ),
+      ),
+    );
   }
 
   void _friendsChanged() {
@@ -68,6 +221,8 @@ class _AppShellState extends State<AppShell> {
       return;
     }
     unawaited(_feedKey.currentState?.invalidateSession());
+    _launches.clearPending();
+    _disposeS3();
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
       if (nextId != _accountId) {
@@ -79,6 +234,8 @@ class _AppShellState extends State<AppShell> {
         setState(() {
           _accountId = nextId;
           _friendIds = null;
+          _currentIndex = 0;
+          _createS3();
         });
       }
     }
@@ -106,6 +263,10 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _launches.removeListener(_scheduleLaunch);
+    if (widget.notificationLaunches == null) _launches.dispose();
+    _disposeS3();
     widget.authController.removeListener(_sessionChanged);
     _friendsController.removeListener(_friendsChanged);
     _friendsController.dispose();
@@ -122,7 +283,17 @@ class _AppShellState extends State<AppShell> {
     ];
 
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: screens),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            if (_s3 != null) _buildS3Header(),
+            Expanded(
+              child: IndexedStack(index: _currentIndex, children: screens),
+            ),
+          ],
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
@@ -172,50 +343,61 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  Widget _buildChatTab() {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Tin nhắn',
-          style: TextStyle(fontWeight: FontWeight.bold),
+  Widget _buildS3Header() {
+    final session = _s3!;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: const Color(0xFFEAF0F7),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 16, right: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    session.isDemo ? 'S3 · Dữ liệu mô phỏng' : 'LocCoc',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Thông báo',
+                  onPressed: _openNotifications,
+                  icon: Badge(
+                    key: const Key('s3-unread-badge'),
+                    isLabelVisible: session.notifications.unreadCount > 0,
+                    label: Text(
+                      session.notifications.unreadCount > 99
+                          ? '99+'
+                          : '${session.notifications.unreadCount}',
+                    ),
+                    child: const Icon(Icons.notifications_outlined),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        backgroundColor: const Color(0xFF17365D),
-        foregroundColor: Colors.white,
-      ),
-      body: Center(
+      ],
+    );
+  }
+
+  Widget _buildChatTab() {
+    final session = _s3;
+    if (session != null) {
+      return ConversationListScreen(
+        controller: session.chat,
+        active: _currentIndex == 2,
+      );
+    }
+    return Scaffold(
+      appBar: AppBar(title: const Text('Tin nhắn')),
+      body: const Center(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F7FB),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.mark_chat_unread_outlined,
-                  size: 64,
-                  color: Color(0xFF17365D),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Nhắn tin Realtime 1-1',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF17365D),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Tính năng nhắn tin trực tiếp và thông báo đẩy đang được lên kế hoạch trong Sprint 3 (LC-S3-01 đến LC-S3-04).',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.black54),
-              ),
-            ],
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Tin nhắn sẽ sẵn sàng khi dịch vụ được kết nối.',
+            textAlign: TextAlign.center,
           ),
         ),
       ),

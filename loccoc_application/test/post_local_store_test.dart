@@ -44,4 +44,28 @@ void main() {
       expect(await b.read('draft'), isNull);
     },
   );
+  test(
+    'clearing feed cannot delete offline chat for the same account',
+    () async {
+      final feed = PostLocalStore(accountId: 1, directory: dir.path);
+      final chat = PostLocalStore(
+        accountId: 1,
+        directory: dir.path,
+        namespace: 's3-chat',
+      );
+      await feed.write('snapshot', {'feed': true});
+      await chat.write('queue', {'message': 'pending'});
+      await feed.clear();
+      expect(await chat.read('queue'), {'message': 'pending'});
+      expect(await feed.read('snapshot'), isNull);
+      expect(
+        await PostLocalStore(
+          accountId: 2,
+          directory: dir.path,
+          namespace: 's3-chat',
+        ).read('queue'),
+        isNull,
+      );
+    },
+  );
 }

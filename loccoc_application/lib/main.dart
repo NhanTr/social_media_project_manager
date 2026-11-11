@@ -6,6 +6,8 @@ import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/terms_screen.dart';
 import 'features/shell/app_shell.dart';
+import 'features/chat/chat_screen.dart';
+import 'features/s3/notification_launch_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,8 +18,13 @@ void main() async {
 
 class LocCocApp extends StatelessWidget {
   final AuthController authController;
+  final NotificationLaunchController? notificationLaunches;
 
-  const LocCocApp({super.key, required this.authController});
+  const LocCocApp({
+    super.key,
+    required this.authController,
+    this.notificationLaunches,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +33,7 @@ class LocCocApp extends StatelessWidget {
       builder: (context, _) {
         return MaterialApp(
           title: AppConfig.appName,
+          navigatorObservers: [chatRouteObserver],
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             useMaterial3: true,
@@ -60,6 +68,7 @@ class LocCocApp extends StatelessWidget {
         return AppShell(
           key: ValueKey(authController.currentUser?.id),
           authController: authController,
+          notificationLaunches: notificationLaunches,
         );
     }
   }
