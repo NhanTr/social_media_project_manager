@@ -20,6 +20,8 @@ public class Message {
     private Long conversationId;
     @Column(name = "sender_id", nullable = false)
     private Long senderId;
+    @Column(name = "client_message_id", length = 100)
+    private String clientMessageId;
     @Column
     private String content;
     @Column(name = "media_url")
@@ -43,12 +45,14 @@ public class Message {
     private Instant readAt;
 
     protected Message() {}
+
     public Message(
-            Long conversationId, Long senderId, String content, String mediaUrl,
-            String thumbnailUrl, Type type, boolean delivered
+            Long conversationId, Long senderId, String clientMessageId, String content,
+            String mediaUrl, String thumbnailUrl, Type type, boolean delivered
     ) {
         this.conversationId = conversationId;
         this.senderId = senderId;
+        this.clientMessageId = clientMessageId;
         this.content = content;
         this.mediaUrl = mediaUrl;
         this.thumbnailUrl = thumbnailUrl;
@@ -56,9 +60,18 @@ public class Message {
         this.status = delivered ? Status.DELIVERED : Status.SENT;
         this.deliveredAt = delivered ? Instant.now() : null;
     }
+
+    public Message(
+            Long conversationId, Long senderId, String content, String mediaUrl,
+            String thumbnailUrl, Type type, boolean delivered
+    ) {
+        this(conversationId, senderId, null, content, mediaUrl, thumbnailUrl, type, delivered);
+    }
+
     public Long getId() { return id; }
     public Long getConversationId() { return conversationId; }
     public Long getSenderId() { return senderId; }
+    public String getClientMessageId() { return clientMessageId; }
     public String getContent() { return content; }
     public String getMediaUrl() { return mediaUrl; }
     public String getThumbnailUrl() { return thumbnailUrl; }
@@ -67,4 +80,33 @@ public class Message {
     public Instant getSentAt() { return sentAt; }
     public Instant getDeliveredAt() { return deliveredAt; }
     public Instant getReadAt() { return readAt; }
+
+    /**
+     * Monotonic transition: SENT -> DELIVERED.
+     * If already DELIVERED or READ, it will not regress.
+     */
+    public boolean markDelivered(Instant timestamp) {
+        if (this.status == Status.SENT) {
+            this.status = Status.DELIVERED;
+            this.deliveredAt = timestamp != null ? timestamp : Instant.now();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Monotonic transition: SENT/DELIVERED -> READ.
+     * If already READ, it will not regress.
+     */
+    public boolean markRead(Instant timestamp) {
+        if (this.status != Status.READ) {
+            this.status = Status.READ;
+            this.readAt = timestamp != null ? timestamp : Instant.now();
+            if (this.deliveredAt == null) {
+                this.deliveredAt = this.readAt;
+            }
+            return true;
+        }
+        return false;
+    }
 }

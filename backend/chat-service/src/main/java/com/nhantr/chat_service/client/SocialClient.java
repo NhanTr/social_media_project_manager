@@ -9,6 +9,11 @@ public class SocialClient {
     private final RestClient client;
     private final String internalApiKey;
 
+    protected SocialClient() {
+        this.client = null;
+        this.internalApiKey = null;
+    }
+
     public SocialClient(
             @Value("${clients.social.base-url}") String baseUrl,
             @Value("${app.internal-api-key}") String internalApiKey

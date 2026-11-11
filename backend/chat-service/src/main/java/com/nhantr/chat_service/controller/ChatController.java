@@ -51,10 +51,16 @@ public class ChatController {
         return service.send(user.id(), request);
     }
 
+    @PostMapping("/api/v1/conversations/{id}/delivered")
+    public DeliveredResponse delivered(@AuthenticationPrincipal CurrentUser user, @PathVariable Long id) {
+        return new DeliveredResponse(service.markDelivered(user.id(), id));
+    }
+
     @PostMapping("/api/v1/conversations/{id}/read")
     public ReadResponse read(@AuthenticationPrincipal CurrentUser user, @PathVariable Long id) {
         return new ReadResponse(service.markRead(user.id(), id));
     }
 
+    public record DeliveredResponse(int updated) {}
     public record ReadResponse(int updated) {}
 }
