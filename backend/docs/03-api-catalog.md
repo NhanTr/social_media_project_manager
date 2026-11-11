@@ -258,6 +258,8 @@ WebSocket:
 
 `status`: `PENDING`, `PROCESSING`, `SUCCESS`, `FAILED`.
 
+> S4 mobile subscription/checkout: [proposed contract](contracts/s4-mobile-subscription.md) and [draft OpenAPI](contracts/s4-mobile-subscription.yaml). These endpoints are not implemented in the fetched backend; LC-S4-01/02 must supply them before live acceptance. Existing AI APIs still require service-side subscription enforcement before paid rollout.
+
 ## 8. Moderation API
 
 | Method | Path | Auth | Input | Kết quả |

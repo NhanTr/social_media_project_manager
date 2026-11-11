@@ -71,6 +71,10 @@ Nên hỗ trợ receipt theo `lastMessageId` để batch và idempotent.
 
 ## 3. API P1 nên bổ sung
 
+### Subscription and payment sandbox — LC-S4-01/02 dependency
+
+Flutter LC-S4-03 includes paywall, server entitlement refresh, sandbox-only external checkout, cancel-at-period-end UI and an AI gate. The [mobile contract/OpenAPI proposal](contracts/s4-mobile-subscription.md) does not implement Subscription/Payment services or Gateway routes. Live checkout/webhook, cross-service entitlement authorization, backend idempotency, catalog prices and effective expiry remain pending LC-S4-01/02. Missing endpoints lock the mobile feature; fixture acceptance is not a live payment test. Production payment and AI adapters remain deferred as above.
+
 ### Saved posts
 
 - `POST /api/v1/posts/{id}/save`
