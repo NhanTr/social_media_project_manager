@@ -4,7 +4,10 @@ import com.nhantr.chat_service.entity.Conversation;
 import com.nhantr.chat_service.entity.Message;
 import com.nhantr.chat_service.repository.ConversationRepository;
 import com.nhantr.chat_service.repository.MessageRepository;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.repository.query.FluentQuery;
 
 import java.lang.reflect.Field;
