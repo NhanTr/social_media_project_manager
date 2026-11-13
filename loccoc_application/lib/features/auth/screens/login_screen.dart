@@ -130,13 +130,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 24),
 
                       if (controller.errorMessage != null) ...[
-                        SizedBox(
-                          height: 112,
-                          child: RetryableAsyncView(
-                            isLoading: false,
-                            errorMessage: controller.errorMessage,
-                            child: const SizedBox.shrink(),
-                          ),
+                        RetryableAsyncView(
+                          isLoading: false,
+                          errorMessage: controller.errorMessage,
+                          child: const SizedBox.shrink(),
                         ),
                         const SizedBox(height: 16),
                       ],
