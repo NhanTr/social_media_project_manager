@@ -53,8 +53,10 @@ services:
     networks: [loccoc]
 
   minio:
-    image: minio/minio:latest
-    platform: linux/amd64
+    image: loccoc-minio:7aac2a2c5b7c
+    build:
+      context: .
+      dockerfile: Dockerfile.minio
     container_name: loccoc-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -67,7 +69,7 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 5s
       retries: 20

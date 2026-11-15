@@ -63,7 +63,7 @@ jobs:
 
   backend-quality-gate:
     name: Backend Build & Unit Tests
-    timeout-minutes: 15
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -79,6 +79,9 @@ jobs:
       - name: Run Java source lint
         working-directory: backend
         run: mvn -B -DskipTests checkstyle:check
+
+      - name: Build pinned official MinIO source for integration
+        run: docker build -t loccoc-minio:7aac2a2c5b7c -f backend/Dockerfile.minio backend
 
       - name: Run Maven build and tests
         working-directory: backend

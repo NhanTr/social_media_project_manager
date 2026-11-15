@@ -49,7 +49,7 @@ class MediaLifecycleIntegrationTests {
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("social_media_ai_db").withUsername("loccoc").withPassword("loccoc");
     @Container
-    static final GenericContainer<?> MINIO = new GenericContainer<>(System.getProperty("loccoc.test.minio.image", "minio/minio:latest"))
+    static final GenericContainer<?> MINIO = new GenericContainer<>(System.getProperty("loccoc.test.minio.image", "loccoc-minio:7aac2a2c5b7c"))
             .withEnv("MINIO_ROOT_USER","minioadmin").withEnv("MINIO_ROOT_PASSWORD","minioadmin")
             .withCommand("server /data").withExposedPorts(9000)
             .waitingFor(Wait.forHttp("/minio/health/ready").forPort(9000));

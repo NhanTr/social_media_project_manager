@@ -61,9 +61,12 @@ Files: common-lib/**, gateway filters except shared configuration above, identit
 - [x] Run full Maven clean verify/checkstyle, repository policy suite, Compose validation, migration on empty DB and full runtime health/critical HTTP smoke where infrastructure is available.
 - [x] Run Flutter subscription tests/analyze against the preserved client contract.
 - [x] Review combined changes; fix material findings with regression tests; record acceptance per card and any external dependency.
-- [ ] Commit/push a feature branch and open linked draft PR; inspect CI and fix failures. Move only acceptance-complete cards to Review & QA. Leave blocked cards In Progress with a precise reason.
+- [x] Commit/push feature branch and open PR #11 linked to all five cards.
+- CI confirmation and final Review & QA moves are tracked on PR #11 and the live Trello board; no automatic merge or Done transition.
 
 ## Execution ledger
 - 2026-11-15: Ready empty; user explicitly confirmed the five In Progress cards. Existing UI PR #10 is draft and remains untouched. GitHub connector confirmed no subscription branch. Shell git fetch is network-restricted; connector read access works. Baseline Maven tests started before edits.
 
-- Final local evidence: 192 backend tests with zero failures/errors/skips, 208 Flutter tests, 16 policy tests, full isolated Gateway/HTTPS sandbox + retention PASS. V12 was required by the actual tombstone constraint regression. Full runtime exposed and now tests real JWT role normalization, Identity CHAR mapping and Gateway admin/internal routing. No P1/P2 remains from independent review. Publication/CI/card moves are the remaining execution steps.
+- Final local evidence: 192 backend tests with zero failures/errors/skips, 208 Flutter tests, 16 policy tests, full isolated Gateway/HTTPS sandbox + retention PASS. V12 was required by the actual tombstone constraint regression. Full runtime exposed and now tests real JWT role normalization, Identity CHAR mapping and Gateway admin/internal routing. No P1/P2 remains from independent review. PR #11 is published; CI confirmation/card moves are tracked on the PR and live board.
+
+- Clean-runner follow-up: DockerHub/Quay MinIO anonymous pulls failed. Added an official pinned-source MinIO image build used by Compose, Testcontainers and runtime harness. Source build, 51 common/Post tests and full Gateway/HTTPS/retention harness all passed; revised CI builds the image before acceptance.

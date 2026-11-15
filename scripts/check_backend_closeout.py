@@ -52,15 +52,19 @@ def main():
             containers.append(name)
             return name, int(command("docker", "port", name, str(target)).rsplit(":", 1)[1])
         try:
+            minio_image=os.environ.get("LOCCOC_MINIO_IMAGE", "loccoc-minio:7aac2a2c5b7c")
+            try:command("docker","image","inspect",minio_image)
+            except subprocess.CalledProcessError:
+                raise RuntimeError("Build the pinned MinIO image first: docker build -t loccoc-minio:7aac2a2c5b7c -f backend/Dockerfile.minio backend")
             pg, pgport = infrastructure("postgres", "postgres:16-alpine", 5432,
                 "-e", "POSTGRES_DB=social_media_ai_db", "-e", "POSTGRES_USER=postgres", "-e", "POSTGRES_PASSWORD=test-only-password")
             _, redisport = infrastructure("redis", "redis:7-alpine", 6379)
-            _, minioport = infrastructure("minio", "minio/minio:latest", 9000,
+            _, minioport = infrastructure("minio", minio_image, 9000,
                 "-e", "MINIO_ROOT_USER=closeout-test", "-e", "MINIO_ROOT_PASSWORD=closeout-test-password")
             deadline = time.monotonic()+60
             while True:
                 try:
-                    command("docker", "exec", pg, "pg_isready", "-U", "postgres", "-d", "social_media_ai_db")
+                    command("docker", "exec", pg, "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "social_media_ai_db")
                     break
                 except subprocess.CalledProcessError:
                     if time.monotonic()>deadline: raise

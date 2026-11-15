@@ -44,3 +44,9 @@ CI now enables the actual MinIO integration test and runs the full gateway/HTTPS
 ## Rollback
 
 Disable hosted sandbox and retention apply, restore the prior application artifact, and preserve payment/moderation audit history. Do not drop tables or rewrite applied migration checksums. Resolve schema changes with reviewed forward migrations and the environment backup/restore procedure; do not delete local data volumes. Previous mobile behavior fails closed when subscription endpoints are unavailable.
+
+## Clean-runner MinIO source build
+
+The final local/CI object-store image is `loccoc-minio:7aac2a2c5b7c`, built with `backend/Dockerfile.minio` from official MinIO commit `7aac2a2c5b7c882e68c1ce017d8256be2feea27f`. DockerHub and Quay anonymous pulls were verified unavailable; the upstream [source installation guidance](https://github.com/minio/minio#install-from-source) supports the pinned build. The image preserves source/revision/license metadata and AGPL license. Compose builds the same image and uses its HTTP health endpoint; CI builds it before real storage tests, without depending on any developer image cache.
+
+After this change, all 51 common/Post tests passed with the source-built MinIO, and the full Gateway/HTTPS/retention runtime harness passed again. PostgreSQL readiness checks TCP on 127.0.0.1, avoiding the official image's temporary Unix-socket init server. Final clean-runner CI is tracked on PR #11; the first run already passed Flutter, security and migration but exposed the removed registry image.

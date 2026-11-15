@@ -8,5 +8,10 @@
     "account retention dry-run leaves exact DB state; explicit isolated apply anonymizes after owner cleanup",
     "sanitized request ID present across gateway/domain/internal logs; no generated fallback passwords"
   ],
-  "provider": "local hosted sandbox; synthetic AI; no third-party provider"
+  "provider": "local hosted sandbox; synthetic AI; no third-party provider",
+  "objectStorage": {
+    "image": "loccoc-minio:7aac2a2c5b7c",
+    "source": "https://github.com/minio/minio",
+    "revision": "7aac2a2c5b7c882e68c1ce017d8256be2feea27f"
+  }
 }

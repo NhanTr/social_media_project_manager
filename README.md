@@ -121,6 +121,7 @@ volume dữ liệu local. Script tự mở TLS proxy local, kiểm tra luồng v
 
 ```sh
 cd backend
+docker build -t loccoc-minio:7aac2a2c5b7c -f Dockerfile.minio .
 LOCCOC_MEDIA_STORAGE_IT=true mvn -B clean verify checkstyle:check
 cd ..
 python3 scripts/check_backend_closeout.py
@@ -131,3 +132,5 @@ provider AI/payment production hoặc nghiệm thu browser trên điện thoại
 Account retention mặc định disabled/dry-run; media cleanup mặc định dry-run.
 Xem [runbook security/retention](backend/docs/contracts/lc-s5-01-security.md) trước khi
 chạy apply trên staging. Việc ẩn bài không thu hồi URL media công khai đã phát trước đó.
+
+MinIO local/CI được build từ commit chính thức cố định `7aac2a2c5b7c882e68c1ce017d8256be2feea27f` bằng `backend/Dockerfile.minio`, cùng source/license metadata trong image. Không phụ thuộc image DockerHub/Quay không còn cho anonymous pull. Đây là cấu hình demo/CI, không tự xác nhận vận hành object storage production.
