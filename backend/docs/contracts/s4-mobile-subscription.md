@@ -1,4 +1,6 @@
-# LC-S4-03 mobile subscription contract — proposed
+# LC-S4-03 mobile subscription contract
+
+> Backend implementation update, 15 November 2026: LC-S4-01/02 now implement this interface with a local hosted sandbox on this branch. See [runtime contract](lc-s4-01-02-subscription-payment.md). The dated proposal below records the original handoff and is superseded where it says endpoints do not exist. No real third-party payment provider is claimed.
 
 Status on 12 November 2026: **proposed mobile integration contract**. No subscription/payment service or Gateway route exists in fetched `origin/dev` (`ea52c38`) or another fetched branch. LC-S4-01 and LC-S4-02 remain In Progress. The Flutter implementation uses these paths but reports unavailable/locks AI until they exist. This document does not claim a working payment provider or webhook. Machine-readable draft: [s4-mobile-subscription.yaml](s4-mobile-subscription.yaml).
 

@@ -27,6 +27,7 @@
         <module>chat-service</module>
         <module>ai-service</module>
         <module>moderation-service</module>
+        <module>subscription-service</module>
     </modules>
 
     <properties>

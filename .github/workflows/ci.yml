@@ -82,7 +82,12 @@ jobs:
 
       - name: Run Maven build and tests
         working-directory: backend
+        env:
+          LOCCOC_MEDIA_STORAGE_IT: "true"
         run: mvn -B clean verify
+
+      - name: Verify full backend gateway and HTTPS sandbox journeys
+        run: python3 scripts/check_backend_closeout.py
 
       - name: Upload backend test reports
         if: always()
@@ -102,7 +107,7 @@ jobs:
           POSTGRES_DB: social_media_ai_db
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ci-only-password
-        ports: [5432:5432]
+        ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres -d social_media_ai_db"
           --health-interval 5s --health-timeout 5s --health-retries 10

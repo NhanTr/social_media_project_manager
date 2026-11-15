@@ -348,3 +348,8 @@ Caller nên gửi `Idempotency-Key` ổn định theo domain event để tránh 
 ## Rà soát S3-02 / S3-04 — 06/11/2026
 
 Xem [contract bàn giao](contracts/s3-mobile-api-contract.md) và [OpenAPI đích (draft)](contracts/s3-mobile.openapi.json) cho clientMessageId, receipt, unread count và typed notification target. Mốc dev là eefc3a5; chat b8e6cb4 và notification 0d17536 chưa merge. Các phần bổ sung đề xuất chưa có hiệu lực runtime. Giới hạn history trên nhánh chat là 100, notification là 50; không áp dụng mô tả “tối đa 50” chung ở trên cho mọi endpoint.
+
+
+## Backend closeout — 15 November 2026
+
+Subscription/payment is now implemented by `subscription-service` (:8088), routed through Gateway for `/api/v1/subscriptions/**`, `/api/v1/payments/**`, and `/api/v1/admin/subscriptions/**` (before the generic Admin route). It owns the V9 subscription/account/checkout/event/audit tables, accessed by other services only through authenticated internal REST. [Runtime contract](contracts/lc-s4-01-02-subscription-payment.md) supersedes older “not implemented” text. Payment is a hosted local sandbox only. AI generation reads a short-lived explicit server grant; production AI/payment adapters remain deferred. Moderation audit and security/retention updates are described in their closeout contracts.

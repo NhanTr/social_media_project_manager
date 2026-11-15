@@ -41,7 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /** Real PostgreSQL + MinIO and HTTP object transport; domain-service boundaries for publication. */
-@SpringBootTest(properties = {"spring.jpa.hibernate.ddl-auto=validate", "spring.flyway.enabled=false"})
+@SpringBootTest(properties = {"spring.jpa.hibernate.ddl-auto=validate", "spring.flyway.enabled=false", "retention.media.dry-run=false"})
 @Testcontainers(disabledWithoutDocker = true)
 @EnabledIfEnvironmentVariable(named = "LOCCOC_MEDIA_STORAGE_IT", matches = "true")
 class MediaLifecycleIntegrationTests {

@@ -36,7 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
-@SpringBootTest(properties = {"spring.jpa.hibernate.ddl-auto=validate", "spring.flyway.enabled=false"})
+@SpringBootTest(properties = {"spring.jpa.hibernate.ddl-auto=validate", "spring.flyway.enabled=false", "retention.media.dry-run=false"})
 @Testcontainers(disabledWithoutDocker = true)
 class PostPublicationConcurrencyTests {
     @Container
@@ -63,7 +63,9 @@ class PostPublicationConcurrencyTests {
 
     @Autowired PostService service;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.nhantr.post_service.repository.PostRepository postRepository;
     @Autowired MediaCleanupService cleanup;
+    @Autowired com.nhantr.post_service.storage.AccountMediaRetentionService accountRetention;
     @MockitoBean SocialClient social;
     @MockitoBean IdentityClient identity;
     @MockitoBean NotificationClient notifications;
@@ -77,6 +79,30 @@ class PostPublicationConcurrencyTests {
         jdbc.update("UPDATE media_uploads SET media_url='http://localhost:9000/loccoc-media/users/1/uploads/a.jpg',file_size_bytes=123,media_width=100,media_height=80 WHERE id=10");
         when(social.friendIds(anyLong())).thenReturn(List.of(2L));
         when(identity.batch(any())).thenReturn(List.of(new IdentityClient.UserSummary(1L,"one","One",null)));
+    }
+
+    @Test
+    void retainedMediaQueryIncludesActiveAndHiddenThumbnails() {
+        jdbc.update("INSERT INTO posts(user_id,media_type,media_url,thumbnail_url,visibility,status) VALUES (2,'IMAGE','http://media/other.jpg','http://media/retained-thumbnail.jpg','FRIENDS_ONLY','HIDDEN')");
+        assertThat(postRepository.existsRetainedMediaReference("http://media/retained-thumbnail.jpg", List.of(Post.Status.ACTIVE, Post.Status.HIDDEN))).isTrue();
+        assertThat(postRepository.existsRetainedMediaReference("http://media/unreferenced.jpg", List.of(Post.Status.ACTIVE, Post.Status.HIDDEN))).isFalse();
+    }
+
+    @Test
+    void accountRetentionPreviewPreservesDataAndApplyIsOwnerBoundedAndReplayable() {
+        service.create(1L, request(UUID.randomUUID(), 10L, "caption"));
+        jdbc.update("INSERT INTO posts(user_id,media_type,media_url,visibility) VALUES (2,'IMAGE','http://media/other.jpg','FRIENDS_ONLY')");
+        var beforeQueue = jdbc.queryForObject("SELECT count(*) FROM media_cleanup_queue", Integer.class);
+        var preview = accountRetention.cleanup(1L, true);
+        assertThat(preview.posts()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM posts WHERE status='ACTIVE'", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM media_cleanup_queue", Integer.class)).isEqualTo(beforeQueue);
+        assertThat(accountRetention.cleanup(1L, false).complete()).isFalse();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM posts WHERE user_id=1 AND status='DELETED'", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM posts WHERE user_id=2 AND status='ACTIVE'", Integer.class)).isEqualTo(1);
+        assertThat(accountRetention.cleanup(1L, false).posts()).isZero();
+        jdbc.update("UPDATE media_cleanup_queue SET done_at=now() WHERE object_key LIKE 'users/1/%'");
+        assertThat(accountRetention.cleanup(1L, false).complete()).isTrue();
     }
 
     private PostService.CreatePostRequest request(UUID key, Long uploadId, String caption) {

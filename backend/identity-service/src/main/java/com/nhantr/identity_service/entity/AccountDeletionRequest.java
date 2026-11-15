@@ -32,6 +32,8 @@ public class AccountDeletionRequest {
         this.userId = userId;
         this.scheduledPurgeAt = scheduledPurgeAt;
     }
+    public Long getUserId() { return userId; }
+    public void complete() { status = Status.COMPLETED; }
     public Long getId() { return id; }
     public Status getStatus() { return status; }
     public Instant getScheduledPurgeAt() { return scheduledPurgeAt; }

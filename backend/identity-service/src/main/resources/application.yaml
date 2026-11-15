@@ -2,6 +2,8 @@ server:
   port: 8081
 
 spring:
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   application:
     name: identity-service
   datasource:
@@ -36,7 +38,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
   health:
     redis:
       enabled: true
@@ -46,5 +48,7 @@ springdoc:
     path: /swagger-ui.html
 
 logging:
+  level:
+    org.hibernate.orm.jdbc.error: "OFF"
   pattern:
     level: "%5p [${spring.application.name:},%X{requestId:-}]"

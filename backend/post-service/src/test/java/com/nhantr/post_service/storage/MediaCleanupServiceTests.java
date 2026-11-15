@@ -18,22 +18,44 @@ class MediaCleanupServiceTests {
 
     private MediaCleanupRepository queue;
     private MediaCleanupService service;
+    private PostRepository posts;
+    private MinioClient minio;
 
     @BeforeEach
     void setUp() {
         queue = mock(MediaCleanupRepository.class);
-        MinioClient minio = MinioClient.builder()
-                .endpoint("http://localhost:9000")
-                .credentials("minioadmin", "minioadmin")
-                .build();
+        minio = mock(MinioClient.class);
+        posts = mock(PostRepository.class);
         service = new MediaCleanupService(
                 queue,
                 mock(MediaUploadRepository.class),
-                mock(PostRepository.class),
+                posts,
                 minio,
                 "loccoc-media",
                 "http://localhost:9000"
         );
+    }
+
+    @Test
+    void activeThumbnailReferencePreventsPhysicalDeletion() {
+        var item = new MediaCleanupItem("users/1/thumbnail.png");
+        org.mockito.Mockito.when(queue.findTop25ByDoneAtIsNullAndScheduledAtBeforeOrderByScheduledAtAsc(any()))
+                .thenReturn(java.util.List.of(item));
+        org.mockito.Mockito.when(posts.existsRetainedMediaReference(org.mockito.ArgumentMatchers.eq("http://localhost:9000/loccoc-media/users/1/thumbnail.png"), any()))
+                .thenReturn(true);
+        service.processQueue(false);
+        org.mockito.Mockito.verifyNoInteractions(minio);
+        assertThat(item.getDoneAt()).isNull();
+    }
+
+    @Test
+    void dryRunDoesNotMutateQueueOrDeleteStorage() {
+        var item = new MediaCleanupItem("users/1/x.png");
+        org.mockito.Mockito.when(queue.findTop25ByDoneAtIsNullAndScheduledAtBeforeOrderByScheduledAtAsc(any()))
+                .thenReturn(java.util.List.of(item));
+        assertThat(service.processQueue(true)).isEqualTo(1);
+        verify(queue, org.mockito.Mockito.never()).save(any());
+        assertThat(item.getAttempts()).isZero();
     }
 
     @Test

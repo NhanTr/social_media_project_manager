@@ -1,6 +1,7 @@
 package com.nhantr.moderation_service.entity;
 
 import jakarta.persistence.*;
+import com.nhantr.common.api.ApiException;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.type.SqlTypes;
@@ -11,7 +12,10 @@ import java.time.Instant;
 @Table(name = "reports")
 public class Report {
     public enum Status { PENDING, INVESTIGATING, RESOLVED, REJECTED }
-    public enum Action { NONE, HIDE_POST, DELETE_POST, WARN_USER, BAN_USER, REJECT_REPORT }
+    public enum Action { NONE, HIDE_POST, DELETE_POST, WARN_USER, BAN_USER, REJECT_REPORT;
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public static Action parse(String value) { return "REJECT".equals(value) ? REJECT_REPORT : valueOf(value); }
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,6 +46,14 @@ public class Report {
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
+    @Column(name = "notification_delivered", nullable = false)
+    private boolean notificationDelivered;
+
+    @Column(name = "next_attempt_at")
+    private Instant nextAttemptAt;
+    @Column(name = "attempt_count", nullable = false)
+    private int attemptCount;
+
     protected Report() {}
     public Report(Long reporterId, Long postId, Long userId, String reason) {
         this.reporterId = reporterId;
@@ -60,7 +72,31 @@ public class Report {
     public String getResolutionNote() { return resolutionNote; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getResolvedAt() { return resolvedAt; }
+    public Instant getNextAttemptAt() { return nextAttemptAt; }
+    public void recordAttempt() {
+        attemptCount = Math.min(attemptCount + 1, 8);
+        nextAttemptAt = Instant.now().plusSeconds(Math.min(900, 10L << (attemptCount - 1)));
+    }
+    public boolean isNotificationDelivered() { return notificationDelivered; }
+    public void notificationDelivered() { notificationDelivered = true; }
+    public boolean closed() { return status == Status.RESOLVED || status == Status.REJECTED; }
+    public void prepare(Long adminId, Action action, String note) {
+        if (note == null || note.isBlank()) throw ApiException.badRequest("RESOLUTION_NOTE_REQUIRED", "An audit note is required.");
+        if (action == null || action == Action.NONE) throw ApiException.badRequest("REPORT_ACTION_INVALID", "A final action is required.");
+        if (actionTaken != Action.NONE && (!actionTaken.equals(action) || !java.util.Objects.equals(handledByAdminId, adminId)
+                || !java.util.Objects.equals(resolutionNote, note.trim()))) {
+            throw ApiException.conflict("REPORT_DECISION_IMMUTABLE", "The recorded decision cannot be changed; retry the same decision.");
+        }
+        if (actionTaken == Action.NONE) {
+            actionTaken = action;
+            handledByAdminId = adminId;
+            resolutionNote = note.trim();
+            status = Status.INVESTIGATING;
+        }
+    }
     public void resolve(Long adminId, Action action, String note) {
+        if (closed()) throw ApiException.conflict("REPORT_ALREADY_CLOSED", "Report is closed.");
+        prepare(adminId, action, note);
         status = action == Action.REJECT_REPORT ? Status.REJECTED : Status.RESOLVED;
         actionTaken = action;
         handledByAdminId = adminId;

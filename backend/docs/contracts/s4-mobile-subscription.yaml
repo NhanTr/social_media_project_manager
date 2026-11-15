@@ -1,14 +1,97 @@
 openapi: 3.0.3
 info:
-  title: LocCoc S4 mobile subscription contract (PROPOSED)
-  version: 0.1.0-draft
-  description: Mobile integration proposal for LC-S4-03. Subscription/payment endpoints are NOT implemented in origin/dev ea52c38; requires LC-S4-01/02. Existing AI endpoints are documented separately in the API catalog.
-x-contract-status: proposed-not-implemented
+  title: LocCoc S4 subscription and hosted sandbox contract
+  version: 0.2.0
+  description: Implemented LC-S4-01/02 backend and LC-S4-03 mobile interface. Local hosted payment sandbox only; no real payment provider or charges. Existing AI endpoints are documented in the API catalog.
+x-contract-status: implemented-local-sandbox
 servers:
   - url: http://localhost:8080
 security:
   - bearerAuth: []
 paths:
+  /api/v1/admin/subscriptions/{userId}/override:
+    post:
+      operationId: overrideAccountSubscription
+      description: Requires an admin token with MODERATOR or SUPER_ADMIN role. Append-only audit records actor, before/after tier, effective time and mandatory note.
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: {type: integer, format: int64, minimum: 1}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tier, note]
+              properties:
+                tier: {type: string, enum: [FREE, PLUS]}
+                currentPeriodEnd: {type: string, format: date-time, nullable: true}
+                note: {type: string, minLength: 1, maxLength: 1000}
+      responses:
+        '200':
+          description: Authoritative snapshot after an audited override; PLUS requires a future period end.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snapshot'}
+        default: {$ref: '#/components/responses/Problem'}
+  /api/v1/payments/webhook:
+    post:
+      operationId: receiveSignedSandboxEvent
+      security: []
+      description: Verify HMAC-SHA256 over delivery epoch plus dot plus exact UTF-8 raw body, within five minutes, before JSON parsing. Durable event dedup and order-aware state changes are atomic.
+      parameters:
+        - in: header
+          name: X-Payment-Signature
+          required: true
+          schema: {type: string}
+          description: t=<epoch-seconds>,v1=<hex HMAC-SHA256>
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventId, sessionId, type, occurredAt]
+              properties:
+                eventId: {type: string, maxLength: 128}
+                sessionId: {type: string, format: uuid}
+                type: {type: string, enum: [SUCCEEDED, FAILED, REFUNDED, CANCELED]}
+                occurredAt: {type: string, format: date-time}
+                periodEnd: {type: string, format: date-time, nullable: true}
+      responses:
+        '200':
+          description: Accepted replay or processed event.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  applied: {type: boolean}
+        default: {$ref: '#/components/responses/Problem'}
+  /internal/v1/subscriptions/{userId}/entitlements:
+    get:
+      operationId: getInternalEntitlements
+      description: Direct service-only API. Never routed through Gateway.
+      security: [{internalKey: []}]
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: {type: integer, format: int64, minimum: 1}
+      responses:
+        '200':
+          description: Short-lived explicit grant, Cache-Control no-store.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aiGeneration, validUntil]
+                properties:
+                  aiGeneration: {type: boolean}
+                  validUntil: {type: string, format: date-time}
+        default: {$ref: '#/components/responses/Problem'}
   /api/v1/subscriptions/plans:
     get:
       operationId: listSubscriptionPlans
@@ -83,6 +166,10 @@ paths:
         default: {$ref: '#/components/responses/Problem'}
 components:
   securitySchemes:
+    internalKey:
+      type: apiKey
+      in: header
+      name: X-Internal-Api-Key
     bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
   responses:
     Problem:

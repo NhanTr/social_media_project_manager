@@ -25,10 +25,12 @@ import java.util.List;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final JwtTokenService jwt;
     private final ConversationRepository conversations;
+    private final AccountStateChannelInterceptor accounts;
 
-    public WebSocketConfig(JwtTokenService jwt, ConversationRepository conversations) {
+    public WebSocketConfig(JwtTokenService jwt, ConversationRepository conversations, AccountStateChannelInterceptor accounts) {
         this.jwt = jwt;
         this.conversations = conversations;
+        this.accounts = accounts;
     }
 
     @Override
@@ -47,17 +49,21 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registration.interceptors(new ChannelInterceptor() {
             @Override
             public Message<?> preSend(Message<?> message, MessageChannel channel) {
-                StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+                StompHeaderAccessor accessor = org.springframework.messaging.support.MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+                if (accessor == null || !accessor.isMutable()) accessor = StompHeaderAccessor.wrap(message);
                 if (StompCommand.CONNECT.equals(accessor.getCommand())) {
                     authenticate(accessor);
                 }
                 if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
                     authorizeSubscription(accessor);
                 }
-                return message;
+                return org.springframework.messaging.support.MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
             }
-        });
+        }, accounts);
     }
+
+    @Override
+    public void configureClientOutboundChannel(ChannelRegistration registration) { registration.interceptors(accounts.outbound()); }
 
     private void authenticate(StompHeaderAccessor accessor) {
         String authorization = accessor.getFirstNativeHeader("Authorization");

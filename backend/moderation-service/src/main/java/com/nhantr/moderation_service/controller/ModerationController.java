@@ -10,6 +10,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import com.nhantr.common.api.PageResponse;
+import com.nhantr.moderation_service.entity.Report;
+import com.nhantr.moderation_service.entity.ModerationAudit;
 
 @RestController
 public class ModerationController {
@@ -23,6 +26,7 @@ public class ModerationController {
 
     @PostMapping("/api/v1/reports")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('USER')")
     public ModerationService.ReportResponse report(
             @AuthenticationPrincipal CurrentUser user,
             @Valid @RequestBody ModerationService.CreateReportRequest request
@@ -39,9 +43,20 @@ public class ModerationController {
 
     @GetMapping("/api/v1/admin/reports")
     @PreAuthorize("hasAnyRole('MODERATOR','SUPER_ADMIN')")
-    public List<ModerationService.ReportResponse> reports() {
-        return moderation.list();
+    public List<ModerationService.ReportResponse> reports() { return moderation.list(); }
+
+    @GetMapping("/api/v1/admin/reports/queue")
+    @PreAuthorize("hasAnyRole('MODERATOR','SUPER_ADMIN')")
+    public PageResponse<ModerationService.ReportResponse> reports(
+            @RequestParam(required = false) Report.Status status,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "20") int limit) {
+        return moderation.queue(status, cursor, limit);
     }
+
+    @GetMapping("/api/v1/admin/reports/{id}/audit")
+    @PreAuthorize("hasAnyRole('MODERATOR','SUPER_ADMIN')")
+    public List<ModerationAudit> audit(@PathVariable Long id) { return moderation.audit(id); }
 
     @GetMapping("/api/v1/admin/reports/{id}")
     @PreAuthorize("hasAnyRole('MODERATOR','SUPER_ADMIN')")

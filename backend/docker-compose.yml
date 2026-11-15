@@ -10,6 +10,9 @@ x-service-defaults: &service-defaults
     JWT_SECRET: ${JWT_SECRET:-change-this-local-development-secret-key-at-least-32-bytes}
     INTERNAL_API_KEY: ${INTERNAL_API_KEY:-loccoc-local-internal-key}
     SPRING_PROFILES_ACTIVE: docker
+    IDENTITY_SERVICE_URL: http://identity-service:8081
+    SUBSCRIPTION_SERVICE_URL: http://subscription-service:8088
+    AI_SERVICE_URL: http://ai-service:8086
   depends_on:
     flyway:
       condition: service_completed_successfully
@@ -216,6 +219,24 @@ services:
     ports: ["8087:8087"]
     healthcheck: { test: ["CMD-SHELL", "wget -qO- http://localhost:8087/actuator/health"], interval: 10s, timeout: 5s, retries: 20 }
 
+  subscription-service:
+    <<: *service-defaults
+    container_name: loccoc-subscription
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args: { SERVICE: subscription-service }
+    environment:
+      <<: *service-environment
+      DB_URL: jdbc:postgresql://postgres:5432/social_media_ai_db
+      DB_USERNAME: subscription_service_user
+      DB_PASSWORD: ${SUBSCRIPTION_DB_PASSWORD:-subscription_password}
+      SANDBOX_CHECKOUT_BASE_URL: ${SANDBOX_CHECKOUT_BASE_URL:-https://localhost:8443/api/v1/payments/sandbox/checkouts}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-local-sandbox-webhook-secret-at-least-32-bytes}
+      PAYMENT_SANDBOX_ENABLED: ${PAYMENT_SANDBOX_ENABLED:-true}
+    ports: ["8088:8088"]
+    healthcheck: { test: ["CMD-SHELL", "wget -qO- http://localhost:8088/actuator/health"], interval: 10s, timeout: 5s, retries: 20 }
+
   api-gateway:
     <<: *service-defaults
     container_name: loccoc-gateway
@@ -240,6 +261,7 @@ services:
       chat-service: { condition: service_healthy }
       ai-service: { condition: service_healthy }
       moderation-service: { condition: service_healthy }
+      subscription-service: { condition: service_healthy }
     ports: ["8080:8080"]
     healthcheck: { test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health"], interval: 10s, timeout: 5s, retries: 20 }
 

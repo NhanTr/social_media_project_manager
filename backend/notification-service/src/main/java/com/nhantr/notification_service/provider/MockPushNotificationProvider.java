@@ -19,13 +19,12 @@ public class MockPushNotificationProvider implements PushNotificationProvider {
     public PushDeliveryResult send(PushNotificationPayload payload) {
         sendCount.incrementAndGet();
         if (simulateTransientError.get()) {
-            log.warn("Mock Push: transient delivery failure simulated for token={}", payload.token());
+            log.warn("event=mock_push_delivery status=transient_failure");
             return PushDeliveryResult.transientFailure("Service temporarily unavailable (APNs/FCM timeout)");
         }
 
         String messageId = "push-mock-" + UUID.randomUUID();
-        log.info("Mock Push delivered: messageId={} token={} type={} ref={}",
-                messageId, payload.token(), payload.type(), payload.referenceId());
+        log.info("event=mock_push_delivery status=success message_id={}", messageId);
         return PushDeliveryResult.delivered(messageId);
     }
 

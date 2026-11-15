@@ -161,3 +161,8 @@ Kafka chưa bắt buộc cho MVP; transactional outbox + worker REST đã đủ 
 ## Cập nhật triển khai 16/10/2026
 
 Đã bổ sung cancel request (API + migration + Flutter), sửa OTP/social contract, secure token storage, refresh GETDEL, OTP cooldown/attempt limit và test routing độc lập mạng. CI có migration DB rỗng/validate và artifacts. Các bước Google OAuth credentials, demo Android/iOS, Terms gate trên API nghiệp vụ, concurrency block-vs-accept và review nhóm vẫn cần nghiệm thu; không coi unit test là end-to-end evidence.
+
+
+## Backend closeout — 15 November 2026
+
+Subscription/payment is now implemented by `subscription-service` (:8088), routed through Gateway for `/api/v1/subscriptions/**`, `/api/v1/payments/**`, and `/api/v1/admin/subscriptions/**` (before the generic Admin route). It owns the V9 subscription/account/checkout/event/audit tables, accessed by other services only through authenticated internal REST. [Runtime contract](contracts/lc-s4-01-02-subscription-payment.md) supersedes older “not implemented” text. Payment is a hosted local sandbox only. AI generation reads a short-lived explicit server grant; production AI/payment adapters remain deferred. Moderation audit and security/retention updates are described in their closeout contracts.

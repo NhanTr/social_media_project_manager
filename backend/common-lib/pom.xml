@@ -12,6 +12,8 @@
     <artifactId>common-lib</artifactId>
     <name>common-lib</name>
     <dependencies>
+        <dependency><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId><scope>test</scope></dependency>
+        <dependency><groupId>io.micrometer</groupId><artifactId>micrometer-core</artifactId></dependency>
         <dependency><groupId>org.springframework</groupId><artifactId>spring-webmvc</artifactId></dependency>
         <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-config</artifactId></dependency>
         <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-web</artifactId></dependency>

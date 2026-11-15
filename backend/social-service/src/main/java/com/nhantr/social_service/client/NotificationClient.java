@@ -18,7 +18,7 @@ public class NotificationClient {
             @Value("${clients.notification.base-url}") String baseUrl,
             @Value("${app.internal-api-key}") String internalApiKey
     ) {
-        this.client = RestClient.builder().baseUrl(baseUrl).build();
+        this.client = com.nhantr.common.web.RequestTracing.restClientBuilder().baseUrl(baseUrl).build();
         this.internalApiKey = internalApiKey;
     }
 
@@ -38,7 +38,7 @@ public class NotificationClient {
                     .body(new NotificationEvent(userId, actorId, referenceId, null, null))
                     .retrieve().toBodilessEntity();
         } catch (RuntimeException exception) {
-            log.warn("Notification service unavailable for event {}: {}", path, exception.getMessage());
+            log.warn("event=notification_transport status=unavailable");
         }
     }
 

@@ -16,7 +16,11 @@ public class IdentityClient {
             @Value("${clients.identity.base-url}") String baseUrl,
             @Value("${app.internal-api-key}") String internalApiKey
     ) {
-        this.client = RestClient.builder().baseUrl(baseUrl).build();
+        var transport = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        transport.setConnectTimeout(java.time.Duration.ofSeconds(2));
+        transport.setReadTimeout(java.time.Duration.ofSeconds(5));
+        this.client = com.nhantr.common.web.RequestTracing.restClientBuilder()
+                .requestFactory(transport).baseUrl(baseUrl).build();
         this.internalApiKey = internalApiKey;
     }
 

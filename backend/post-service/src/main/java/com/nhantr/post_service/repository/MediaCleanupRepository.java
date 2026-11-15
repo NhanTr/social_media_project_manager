@@ -10,6 +10,8 @@ import java.time.Instant;
 import java.util.List;
 
 public interface MediaCleanupRepository extends JpaRepository<MediaCleanupItem, Long> {
+    boolean existsByObjectKeyStartingWithAndDoneAtIsNull(String prefix);
+
     @Modifying
     @Transactional
     @Query(value = """
@@ -21,5 +23,6 @@ public interface MediaCleanupRepository extends JpaRepository<MediaCleanupItem, 
             """, nativeQuery = true)
     void enqueue(String objectKey, Instant scheduledAt);
 
+    @Query(value = "SELECT * FROM media_cleanup_queue WHERE done_at IS NULL AND attempts < 5 AND scheduled_at < :boundary ORDER BY scheduled_at LIMIT 25", nativeQuery = true)
     List<MediaCleanupItem> findTop25ByDoneAtIsNullAndScheduledAtBeforeOrderByScheduledAtAsc(Instant boundary);
 }
