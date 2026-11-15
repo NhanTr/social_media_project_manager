@@ -11,11 +11,13 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MediaUploadRepository extends JpaRepository<MediaUpload, Long> {
+    List<MediaUpload> findTop100ByUserIdAndStatusNotOrderByIdAsc(Long userId, MediaUpload.Status status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from MediaUpload u where u.id = :id")
     Optional<MediaUpload> lockById(Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from MediaUpload u where u.status in :statuses and u.expiresAt < :boundary and u.consumedPostId is null order by u.id")
-    List<MediaUpload> lockExpiredOrphans(List<MediaUpload.Status> statuses, Instant boundary);
+    List<MediaUpload> lockExpiredOrphans(List<MediaUpload.Status> statuses, Instant boundary, org.springframework.data.domain.Pageable pageable);
 }

@@ -121,7 +121,12 @@ public class Post {
     public Status getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getDeletedAt() { return deletedAt; }
-    public void setStatus(Status status) { this.status = status; this.updatedAt = Instant.now(); }
+    public void setStatus(Status status) {
+        // A delayed moderation retry must not undo the owner's deletion lifecycle.
+        if (this.status == Status.DELETED && status == Status.HIDDEN) return;
+        this.status = status;
+        this.updatedAt = Instant.now();
+    }
     public void setCaption(String caption) { this.caption = caption; this.updatedAt = Instant.now(); }
     public void setFilterApplied(String filterApplied) { this.filterApplied = filterApplied; this.updatedAt = Instant.now(); }
     public void setVisibility(Visibility visibility) { this.visibility = visibility; this.updatedAt = Instant.now(); }

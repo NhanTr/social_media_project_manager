@@ -18,7 +18,7 @@ public class NotificationClient {
             @Value("${clients.notification.base-url}") String baseUrl,
             @Value("${app.internal-api-key}") String internalApiKey
     ) {
-        this.client = RestClient.builder().baseUrl(baseUrl).build();
+        this.client = com.nhantr.common.web.RequestTracing.restClientBuilder().baseUrl(baseUrl).build();
         this.internalApiKey = internalApiKey;
     }
 

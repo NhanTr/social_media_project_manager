@@ -36,7 +36,10 @@ public class SecurityConfig {
                 new BearerTokenFilter(jwt, internalApiKey),
                 termsAcceptanceFilter,
                 "/api/v1/auth/**",
+                "/api/v1/admin/auth/login",
                 "/api/v1/terms/latest",
+                "/api/v1/payments/webhook",
+                "/api/v1/payments/sandbox/checkouts/**",
                 "/ws/chat/**"
         );
     }

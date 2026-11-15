@@ -14,6 +14,8 @@ import java.time.Instant;
 import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BearerTokenFilterTests {
@@ -54,6 +56,26 @@ class BearerTokenFilterTests {
         filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
 
         assertTrue(currentUser().termsAccepted());
+    }
+
+    @Test
+    void realIdentityAccessTokenWithoutRoleGetsUserPrincipal() throws Exception {
+        authenticate("access", null, true);
+        assertEquals("USER", currentUser().role());
+        assertFalse(currentUser().isAdmin());
+    }
+
+    @Test
+    void accessTokenRoleClaimCannotGrantAdminIdentity() throws Exception {
+        authenticate("access", "SUPER_ADMIN", true);
+        assertEquals("USER", currentUser().role());
+        assertFalse(currentUser().isAdmin());
+    }
+
+    @Test
+    void adminTokenWithoutAnAdminRoleIsNotAnAuthenticatedUser() throws Exception {
+        authenticate("admin", null, true);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
     private void authenticate(String tokenType, String role, Boolean termsAccepted) throws Exception {

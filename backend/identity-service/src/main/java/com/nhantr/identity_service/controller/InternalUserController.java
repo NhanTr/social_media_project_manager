@@ -23,6 +23,14 @@ public class InternalUserController {
         this.service = service;
     }
 
+    @GetMapping("/{id}/active")
+    public ActiveResponse active(@PathVariable Long id) {
+        return new ActiveResponse(repository.findById(id)
+                .map(user -> user.getStatus() == UserStatus.ACTIVE && user.getDeletedAt() == null).orElse(false));
+    }
+
+    public record ActiveResponse(boolean active) {}
+
     @GetMapping("/search")
     public List<UserResponse> search(@RequestParam @Size(min = 1, max = 100) String keyword) {
         return service.search(keyword);

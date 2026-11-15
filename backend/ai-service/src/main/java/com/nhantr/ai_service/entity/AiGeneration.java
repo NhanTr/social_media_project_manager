@@ -6,6 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "ai_generations")
@@ -42,6 +43,15 @@ public class AiGeneration {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "lease_until")
+    private Instant leaseUntil;
+    @Column(name = "attempt_token")
+    private UUID attemptToken;
+    @Column(name = "attempt_count", nullable = false)
+    private int attemptCount;
+    @Column(name = "mock_charge_count", nullable = false)
+    private int mockChargeCount;
+
     protected AiGeneration() {}
     public AiGeneration(Long userId, String originalMediaUrl, String stylePrompt, Type generationType) {
         this.userId = userId;
@@ -60,8 +70,20 @@ public class AiGeneration {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public Instant getCompletedAt() { return completedAt; }
+    public int getAttemptCount() { return attemptCount; }
+    public int getMockChargeCount() { return mockChargeCount; }
+    public Instant getLeaseUntil() { return leaseUntil; }
+    public UUID getAttemptToken() { return attemptToken; }
+    public void claim(Instant now, long leaseSeconds) {
+        processing();
+        attemptCount++;
+        mockChargeCount = 1;
+        attemptToken = UUID.randomUUID();
+        leaseUntil = now.plusSeconds(leaseSeconds);
+    }
+    public boolean accepts(UUID token) { return status == Status.PROCESSING && token.equals(attemptToken); }
     public void processing() { status = Status.PROCESSING; updatedAt = Instant.now(); errorMessage = null; }
-    public void success(String url) { status = Status.SUCCESS; generatedMediaUrl = url; completedAt = Instant.now(); updatedAt = completedAt; }
-    public void fail(String error) { status = Status.FAILED; errorMessage = error; completedAt = Instant.now(); updatedAt = completedAt; }
-    public void retry() { status = Status.PENDING; errorMessage = null; completedAt = null; updatedAt = Instant.now(); }
+    public void success(String url) { leaseUntil = null; status = Status.SUCCESS; generatedMediaUrl = url; completedAt = Instant.now(); updatedAt = completedAt; }
+    public void fail(String error) { leaseUntil = null; generatedMediaUrl = null; status = Status.FAILED; errorMessage = error; completedAt = Instant.now(); updatedAt = completedAt; }
+    public void retry() { leaseUntil = null; attemptToken = null; generatedMediaUrl = null; status = Status.PENDING; errorMessage = null; completedAt = null; updatedAt = Instant.now(); }
 }

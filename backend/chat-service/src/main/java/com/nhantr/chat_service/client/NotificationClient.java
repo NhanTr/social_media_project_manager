@@ -23,7 +23,7 @@ public class NotificationClient {
             @Value("${clients.notification.base-url}") String baseUrl,
             @Value("${app.internal-api-key}") String internalApiKey
     ) {
-        this.client = RestClient.builder().baseUrl(baseUrl).build();
+        this.client = com.nhantr.common.web.RequestTracing.restClientBuilder().baseUrl(baseUrl).build();
         this.internalApiKey = internalApiKey;
     }
 
@@ -35,7 +35,7 @@ public class NotificationClient {
                     .body(new Event(receiverId, senderId, messageId, null, body))
                     .retrieve().toBodilessEntity();
         } catch (RuntimeException exception) {
-            log.warn("Cannot create CHAT_MESSAGE notification: {}", exception.getMessage());
+            log.warn("event=chat_notification_transport status=unavailable");
         }
     }
 

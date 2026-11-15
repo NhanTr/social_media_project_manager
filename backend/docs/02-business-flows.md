@@ -242,3 +242,8 @@ Worker hard-delete, API huỷ yêu cầu trong thời gian ân hạn và trạng
 ## Bổ sung 16/10/2026: hủy lời mời
 
 Sender gọi POST `/api/v1/friend-requests/{id}/cancel`. Social khóa hàng request, kiểm tra sender, chuyển PENDING → CANCELLED; request biến khỏi incoming/outgoing. Gọi lại CANCELLED trả cùng trạng thái. Receiver không được hủy; request đã accept/decline trả conflict. Không tạo friendship hoặc notification khi hủy.
+
+
+## Backend closeout — 15 November 2026
+
+Subscription/payment is now implemented by `subscription-service` (:8088), routed through Gateway for `/api/v1/subscriptions/**`, `/api/v1/payments/**`, and `/api/v1/admin/subscriptions/**` (before the generic Admin route). It owns the V9 subscription/account/checkout/event/audit tables, accessed by other services only through authenticated internal REST. [Runtime contract](contracts/lc-s4-01-02-subscription-payment.md) supersedes older “not implemented” text. Payment is a hosted local sandbox only. AI generation reads a short-lived explicit server grant; production AI/payment adapters remain deferred. Moderation audit and security/retention updates are described in their closeout contracts.

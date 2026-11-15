@@ -18,6 +18,19 @@ class EmailSecurityLoggingTests {
     }
 
     @Test
+    void actualEmailLogsExcludeRecipientsAndArbitraryTemplateVariables() {
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(MockEmailAdapter.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start(); logger.addAppender(appender);
+        try {
+            emailAdapter.send(new EmailSendRequest("private@example.com", EmailTemplateType.AUTH_OTP_ALERT,
+                    Map.of("username", "PRIVATE-NAME", "otpCode", "991122", "custom", "PRIVATE-VALUE"), "private-key"));
+            String logs = appender.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage).collect(java.util.stream.Collectors.joining());
+            assertThat(logs).doesNotContain("private@example.com", "PRIVATE-NAME", "991122", "PRIVATE-VALUE", "private-key");
+        } finally { logger.detachAppender(appender); }
+    }
+
+    @Test
     void sanitizeVariablesMasksOtpCodeAndSecretTokens() {
         Map<String, Object> vars = new HashMap<>();
         vars.put("username", "Tuấn Dũng");

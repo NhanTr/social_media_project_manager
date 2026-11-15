@@ -21,14 +21,10 @@ public class MockEmailAdapter {
     }
 
     public EmailDeliveryResult send(EmailSendRequest request) {
-        RenderedEmail rendered = templateService.render(request.templateType(), request.variables());
-
-        String sanitizedVars = sanitizeVariables(request.variables());
-        log.info("Mock Email sending: to={} template={} vars={}",
-                request.to(), request.templateType(), sanitizedVars);
+        templateService.render(request.templateType(), request.variables());
 
         String messageId = "email-mock-" + UUID.randomUUID();
-        log.info("Mock Email delivered: messageId={} subject=\"{}\"", messageId, rendered.subject());
+        log.info("event=mock_email_delivery status=success message_id={} template={}", messageId, request.templateType());
 
         return EmailDeliveryResult.delivered(messageId);
     }

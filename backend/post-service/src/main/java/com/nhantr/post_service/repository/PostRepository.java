@@ -13,6 +13,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
+    List<Post> findTop100ByUserIdAndStatusNotOrderByIdAsc(Long userId, Post.Status status);
+    @Query("select (count(p) > 0) from Post p where p.status in :statuses and (p.mediaUrl = :url or p.thumbnailUrl = :url)")
+    boolean existsRetainedMediaReference(String url, Collection<Post.Status> statuses);
+
     boolean existsByMediaUrlAndStatusIn(String mediaUrl, Collection<Post.Status> statuses);
 
     Optional<Post> findByUserIdAndClientRequestId(Long userId, UUID clientRequestId);

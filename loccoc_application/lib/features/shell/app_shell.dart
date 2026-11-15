@@ -20,6 +20,8 @@ import '../s3/notification_banner_overlay.dart';
 import '../s3/s3_session.dart';
 import '../s3/s3_target_screen.dart';
 import '../feed/media_detail_screen.dart';
+import '../subscription/subscription_api.dart';
+import '../subscription/subscription_controller.dart';
 
 class AppShell extends StatefulWidget {
   final AuthController authController;
@@ -56,6 +58,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool _s3Ready = false;
   bool _launchScheduled = false;
   bool _foreground = true;
+  late SubscriptionController _subscriptionController;
 
   @override
   void initState() {
@@ -66,6 +69,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       api: widget.authController.apiClient,
     );
     _friendsController.addListener(_friendsChanged);
+    _subscriptionController = _newSubscriptionController();
     widget.authController.addListener(_sessionChanged);
     WidgetsBinding.instance.addObserver(this);
     _foreground =
@@ -204,6 +208,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  SubscriptionController _newSubscriptionController() => SubscriptionController(
+    api: SubscriptionApi(widget.authController.apiClient),
+  );
+
   void _friendsChanged() {
     if (!_friendsController.hasLoadedFriends) return;
     final ids = _friendsController.friends.map((f) => f.id).toSet();
@@ -226,6 +234,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
       if (nextId != _accountId) {
+        _subscriptionController.dispose();
+        _subscriptionController = _newSubscriptionController();
         _friendsController.removeListener(_friendsChanged);
         _friendsController.dispose();
         _friendsController = FriendsController(
@@ -270,6 +280,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     widget.authController.removeListener(_sessionChanged);
     _friendsController.removeListener(_friendsChanged);
     _friendsController.dispose();
+    _subscriptionController.dispose();
     super.dispose();
   }
 
@@ -279,7 +290,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _buildFeedTab(),
       FriendsScreen(key: ValueKey(_accountId), controller: _friendsController),
       _buildChatTab(),
-      ProfileScreen(authController: widget.authController),
+      ProfileScreen(
+        key: ValueKey(_accountId),
+        authController: widget.authController,
+        subscriptionController: _subscriptionController,
+      ),
     ];
 
     return Scaffold(

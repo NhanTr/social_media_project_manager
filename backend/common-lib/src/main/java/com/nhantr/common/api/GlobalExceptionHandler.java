@@ -48,13 +48,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleUnexpected(Exception exception, HttpServletRequest request) {
-        log.error(
-                "Unhandled exception for {} {} (requestId={})",
-                request.getMethod(),
-                request.getRequestURI(),
-                request.getHeader("X-Request-Id"),
-                exception
-        );
+        log.error("event=http_unexpected_error request_id={} exception_type={}",
+                request.getAttribute("requestId"), exception.getClass().getSimpleName());
         return problem(500, "INTERNAL_ERROR", "An unexpected error occurred.", request, null);
     }
 
@@ -69,7 +64,7 @@ public class GlobalExceptionHandler {
         problem.setType(URI.create("https://loccoc.app/problems/" + code.toLowerCase()));
         problem.setTitle(code);
         problem.setProperty("code", code);
-        problem.setProperty("requestId", request.getHeader("X-Request-Id"));
+        problem.setProperty("requestId", request.getAttribute("requestId"));
         if (fieldErrors != null) {
             problem.setProperty("fieldErrors", fieldErrors);
         }

@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class PostService {
+    private final com.nhantr.post_service.client.AiClient ai;
     private final PostRepository repository;
     private final SocialClient social;
     private final IdentityClient identity;
@@ -42,7 +43,8 @@ public class PostService {
             NotificationClient notifications,
             MediaCleanupService cleanup,
             MediaUploadRepository uploads,
-            PublicationLock publicationLock
+            PublicationLock publicationLock,
+            com.nhantr.post_service.client.AiClient ai
     ) {
         this.repository = repository;
         this.social = social;
@@ -51,10 +53,14 @@ public class PostService {
         this.cleanup = cleanup;
         this.uploads = uploads;
         this.publicationLock = publicationLock;
+        this.ai = ai;
     }
 
     @Transactional
     public PostResponse create(Long userId, CreatePostRequest request) {
+        if (Boolean.TRUE.equals(request.aiGenerated()) != (request.aiGenerationId() != null)) {
+            throw ApiException.badRequest("AI_REFERENCE_REQUIRED", "AI posts require aiGenerated=true and aiGenerationId together.");
+        }
         if ((request.clientRequestId() == null) != (request.uploadId() == null)) {
             throw ApiException.badRequest("POST_UPLOAD_BINDING_REQUIRED", "clientRequestId and uploadId must be provided together.");
         }
@@ -91,6 +97,7 @@ public class PostService {
                 throw ApiException.badRequest("UPLOAD_METADATA_MISMATCH", "Media metadata must match the finalized upload.");
             }
         }
+        if (request.aiGenerationId() != null) ai.validate(userId, request.aiGenerationId(), request.mediaUrl());
         if (request.mediaType() == Post.MediaType.GIF
                 && request.durationSeconds() != null
                 && request.durationSeconds() > 5) {

@@ -132,3 +132,8 @@ Nguyên tắc:
 | MinIO API / Console | 9000 / 9001 |
 
 Các secret mặc định chỉ phù hợp local. Production phải thay JWT secret, internal API key, DB/MinIO/admin credential và tắt việc trả OTP trong response.
+
+
+## Backend closeout — 15 November 2026
+
+Subscription/payment is now implemented by `subscription-service` (:8088), routed through Gateway for `/api/v1/subscriptions/**`, `/api/v1/payments/**`, and `/api/v1/admin/subscriptions/**` (before the generic Admin route). It owns the V9 subscription/account/checkout/event/audit tables, accessed by other services only through authenticated internal REST. [Runtime contract](contracts/lc-s4-01-02-subscription-payment.md) supersedes older “not implemented” text. Payment is a hosted local sandbox only. AI generation reads a short-lived explicit server grant; production AI/payment adapters remain deferred. Moderation audit and security/retention updates are described in their closeout contracts.

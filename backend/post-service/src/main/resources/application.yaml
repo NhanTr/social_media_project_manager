@@ -3,6 +3,8 @@ server:
   tomcat:
     max-swallow-size: 25MB
 spring:
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   application:
     name: post-service
   datasource:
@@ -38,10 +40,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
 logging:
+  level:
+    org.hibernate.orm.jdbc.error: "OFF"
   pattern:
     level: "%5p [${spring.application.name:},%X{requestId:-}]"

@@ -34,6 +34,7 @@ public class SecurityConfig {
         return SecuritySupport.serviceChain(
                 http,
                 new BearerTokenFilter(jwt, internalApiKey),
+                new AdminTokenFilter(jwt),
                 "/api/v1/admin/auth/login"
         );
     }

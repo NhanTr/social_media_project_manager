@@ -2,6 +2,8 @@ server:
   port: 8080
 
 spring:
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   application:
     name: api-gateway
   cloud:
@@ -33,6 +35,10 @@ spring:
               uri: ${AI_SERVICE_URL:http://localhost:8086}
               predicates:
                 - Path=/api/v1/ai/**
+            - id: subscription
+              uri: ${SUBSCRIPTION_SERVICE_URL:http://localhost:8088}
+              predicates:
+                - Path=/api/v1/subscriptions/**,/api/v1/payments/**,/api/v1/admin/subscriptions/**
             - id: moderation
               uri: ${MODERATION_SERVICE_URL:http://localhost:8087}
               predicates:
@@ -47,8 +53,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway
+        include: health,info,metrics
 
 logging:
+  level:
+    org.hibernate.orm.jdbc.error: "OFF"
   pattern:
     level: "%5p [${spring.application.name:},%X{requestId:-}]"

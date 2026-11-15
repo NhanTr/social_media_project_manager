@@ -43,7 +43,10 @@ public class BearerTokenFilter extends OncePerRequestFilter {
                 var claims = jwt.parse(authorization.substring(7));
                 String tokenType = claims.get("token_type", String.class);
                 if ("access".equals(tokenType) || "admin".equals(tokenType)) {
-                    String role = claims.get("role", String.class);
+                    String role = "access".equals(tokenType) ? "USER" : claims.get("role", String.class);
+                    if ("admin".equals(tokenType) && !List.of("MODERATOR", "SUPER_ADMIN").contains(role == null ? "" : role)) {
+                        throw new IllegalArgumentException("Admin role is required.");
+                    }
                     boolean termsAccepted = "admin".equals(tokenType)
                             || Boolean.TRUE.equals(claims.get("terms_accepted", Boolean.class));
                     authenticate(

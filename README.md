@@ -2,7 +2,7 @@
 
 Monorepo: Flutter trong `loccoc_application/`, Java 21/Maven backend trong `backend/`.
 Gateway cổng 8080; identity 8081, social 8082, post 8083, notification 8084,
-chat 8085, AI 8086 và moderation 8087. Subscription vẫn nằm trong kế hoạch Sprint 4.
+chat 8085, AI 8086, moderation 8087 và subscription/payment sandbox 8088.
 
 ## Ranh giới MVP đã chốt
 
@@ -105,3 +105,32 @@ flutter run -d <android-or-ios-device-id> -t lib/s3_demo.dart --dart-define=APP_
 Bản web chỉ là công cụ kiểm tra phụ; đầu ra chính là app Android/iOS.
 
 Xem [cách nghiệm thu và nối backend](docs/sprint-s3-02-04-acceptance.md).
+
+## Backend closeout: subscription, AI, moderation và retention
+
+Subscription/Payment dùng local hosted sandbox, không thu tiền thật. Cấu hình
+`SANDBOX_CHECKOUT_BASE_URL` tới HTTPS ingress kết thúc bằng
+`/api/v1/payments/sandbox/checkouts`, và `PAYMENT_WEBHOOK_SECRET` riêng cho môi trường.
+URL local mặc định mong đợi TLS proxy ở :8443; Compose Gateway ở :8080 vẫn là HTTP.
+`PAYMENT_SANDBOX_ENABLED=false` tắt checkout/simulator; profile prod cũng tắt simulator.
+Chỉ webhook có chữ ký mới cấp quyền; quay lại app chỉ làm mới snapshot server.
+Xem [contract và cấu hình](backend/docs/contracts/lc-s4-01-02-subscription-payment.md).
+
+Chạy nghiệm thu hoàn toàn bằng container/database/temp certificate mới; không dùng
+volume dữ liệu local. Script tự mở TLS proxy local, kiểm tra luồng và dọn môi trường:
+
+```sh
+cd backend
+docker build -t loccoc-minio:7aac2a2c5b7c -f Dockerfile.minio .
+LOCCOC_MEDIA_STORAGE_IT=true mvn -B clean verify checkstyle:check
+cd ..
+python3 scripts/check_backend_closeout.py
+```
+
+Cần Docker, Java, Python 3 và openssl. Không dùng bằng chứng này để khẳng định
+provider AI/payment production hoặc nghiệm thu browser trên điện thoại thật.
+Account retention mặc định disabled/dry-run; media cleanup mặc định dry-run.
+Xem [runbook security/retention](backend/docs/contracts/lc-s5-01-security.md) trước khi
+chạy apply trên staging. Việc ẩn bài không thu hồi URL media công khai đã phát trước đó.
+
+MinIO local/CI được build từ commit chính thức cố định `7aac2a2c5b7c882e68c1ce017d8256be2feea27f` bằng `backend/Dockerfile.minio`, cùng source/license metadata trong image. Không phụ thuộc image DockerHub/Quay không còn cho anonymous pull. Đây là cấu hình demo/CI, không tự xác nhận vận hành object storage production.

@@ -3,6 +3,7 @@ package com.nhantr.moderation_service;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+@org.springframework.scheduling.annotation.EnableScheduling
 @SpringBootApplication(scanBasePackages = {"com.nhantr.moderation_service", "com.nhantr.common"})
 public class ModerationServiceApplication {
 

@@ -2,11 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../auth/auth_controller.dart';
 import '../../../core/config/app_config.dart';
+import '../../subscription/subscription_controller.dart';
+import '../../subscription/subscription_screen.dart';
+import '../../subscription/ai_generation_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final AuthController authController;
+  final SubscriptionController? subscriptionController;
 
-  const ProfileScreen({super.key, required this.authController});
+  const ProfileScreen({
+    super.key,
+    required this.authController,
+    this.subscriptionController,
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -145,6 +153,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 16),
+
+                if (widget.subscriptionController case final subscription?) ...[
+                  Card(
+                    child: Column(
+                      children: [
+                        ListTile(
+                          key: const Key('profile-subscription'),
+                          leading: const Icon(Icons.workspace_premium_outlined),
+                          title: const Text('Gói và quyền lợi'),
+                          subtitle: const Text(
+                            'Free / Plus · Thanh toán sandbox',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  SubscriptionScreen(controller: subscription),
+                            ),
+                          ),
+                        ),
+                        ListTile(
+                          key: const Key('profile-ai'),
+                          leading: const Icon(Icons.auto_awesome_outlined),
+                          title: const Text('Tạo ảnh AI'),
+                          subtitle: const Text(
+                            'Kiểm tra quyền truy cập của tài khoản',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  AiGenerationScreen(controller: subscription),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
                 // Edit Profile Form or View Profile Info
                 Card(

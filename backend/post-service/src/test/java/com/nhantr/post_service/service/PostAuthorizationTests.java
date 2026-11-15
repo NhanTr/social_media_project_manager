@@ -33,6 +33,7 @@ class PostAuthorizationTests {
     private SocialClient social;
     private MediaCleanupService cleanup;
     private PostService service;
+    private com.nhantr.post_service.client.AiClient ai;
 
     @BeforeEach
     void setUp() {
@@ -40,6 +41,7 @@ class PostAuthorizationTests {
         social = mock(SocialClient.class);
         cleanup = mock(MediaCleanupService.class);
         IdentityClient identity = mock(IdentityClient.class);
+        ai = mock(com.nhantr.post_service.client.AiClient.class);
         service = new PostService(
                 repository,
                 social,
@@ -47,7 +49,8 @@ class PostAuthorizationTests {
                 mock(NotificationClient.class),
                 cleanup,
                 mock(com.nhantr.post_service.repository.MediaUploadRepository.class),
-                mock(com.nhantr.post_service.repository.PublicationLock.class)
+                mock(com.nhantr.post_service.repository.PublicationLock.class),
+                ai
         );
         when(repository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(identity.batch(any()))
@@ -63,6 +66,31 @@ class PostAuthorizationTests {
 
     private void stubActivePost(Post post) {
         when(repository.findByIdAndStatus(eq(10L), eq(Post.Status.ACTIVE))).thenReturn(Optional.of(post));
+    }
+
+    @Test
+    void aiReferenceRequiresMatchingAiGeneratedFlag() {
+        var request = new PostService.CreatePostRequest(Post.MediaType.IMAGE, MEDIA_URL, null, null, null, null, null,
+                "caption", null, false, 15L, Post.Visibility.FRIENDS_ONLY, null, null);
+        ApiException error = catchThrowableOfType(() -> service.create(OWNER, request), ApiException.class);
+        assertThat(error).isNotNull();
+        assertThat(error.code()).isEqualTo("AI_REFERENCE_REQUIRED");
+        verify(repository, never()).save(any(Post.class));
+    }
+
+    @Test
+    void failedAiValidationCannotPersistButOriginalPostNeedsNoAiService() {
+        org.mockito.Mockito.doThrow(ApiException.badRequest("AI_REFERENCE_INVALID", "Denied"))
+                .when(ai).validate(OWNER, 15L, MEDIA_URL);
+        var request = new PostService.CreatePostRequest(Post.MediaType.IMAGE, MEDIA_URL, null, null, null, null, null,
+                "caption", null, true, 15L, Post.Visibility.FRIENDS_ONLY, null, null);
+        ApiException error = catchThrowableOfType(() -> service.create(OWNER, request), ApiException.class);
+        assertThat(error).isNotNull();
+        assertThat(error.code()).isEqualTo("AI_REFERENCE_INVALID");
+        verify(repository, never()).save(any(Post.class));
+        var original = new PostService.CreatePostRequest(Post.MediaType.IMAGE, MEDIA_URL, null, null, null, null, null,
+                "original fallback", null, false, null, Post.Visibility.FRIENDS_ONLY, null, null);
+        assertThat(service.create(OWNER, original).mediaUrl()).isEqualTo(MEDIA_URL);
     }
 
     @Test
