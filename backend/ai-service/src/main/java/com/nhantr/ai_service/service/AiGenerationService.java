@@ -1,6 +1,7 @@
 package com.nhantr.ai_service.service;
 
 import com.nhantr.ai_service.entity.AiGeneration;
+import com.nhantr.ai_service.entitlement.SubscriptionEntitlementClient;
 import com.nhantr.ai_service.repository.AiGenerationRepository;
 import com.nhantr.common.api.ApiException;
 import jakarta.validation.constraints.NotNull;
@@ -9,24 +10,66 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class AiGenerationService {
     private final AiGenerationRepository repository;
+    private final AiGenerationWorker worker;
+    private final SubscriptionEntitlementClient entitlementClient;
 
-    public AiGenerationService(AiGenerationRepository repository) {
+    public AiGenerationService(
+            AiGenerationRepository repository,
+            AiGenerationWorker worker,
+            SubscriptionEntitlementClient entitlementClient
+    ) {
         this.repository = repository;
+        this.worker = worker;
+        this.entitlementClient = entitlementClient;
     }
 
     @Transactional
-    public GenerationResponse create(Long userId, CreateGenerationRequest request) {
+    public GenerationResponse create(Long userId, CreateGenerationRequest request, String clientRequestId) {
+        String normalizedClientRequestId = normalize(clientRequestId);
+        if (normalizedClientRequestId == null) {
+            normalizedClientRequestId = normalize(request.clientRequestId());
+        }
+
+        // Idempotency: Nếu client gửi trùng clientRequestId, trả về kết quả đã tạo
+        if (normalizedClientRequestId != null) {
+            var existing = repository.findByUserIdAndClientRequestId(userId, normalizedClientRequestId);
+            if (existing.isPresent()) {
+                return GenerationResponse.from(existing.get());
+            }
+        }
+
+        // Entitlement Check: Fail-closed nếu không đủ điều kiện tier
+        var decision = entitlementClient.checkAiEntitlement(
+                userId,
+                request.generationType() != null ? request.generationType().name() : null
+        );
+        if (!decision.allowed()) {
+            throw ApiException.forbidden("AI_TIER_NOT_ENTITLED", decision.reason());
+        }
+
         validate(request);
-        AiGeneration generation = repository.save(new AiGeneration(
-                userId, normalize(request.originalMediaUrl()), request.stylePrompt().trim(), request.generationType()
-        ));
-        schedule(generation.getId());
+
+        AiGeneration generation = new AiGeneration(
+                userId,
+                normalize(request.originalMediaUrl()),
+                request.stylePrompt().trim(),
+                request.generationType(),
+                normalizedClientRequestId,
+                null
+        );
+        generation = repository.save(generation);
+
+        // Reserve 1 mock charge cho generation lifecycle
+        var chargeResult = entitlementClient.reserveCharge(userId, generation.getId());
+        if (chargeResult.success()) {
+            generation.setMockChargeId(chargeResult.chargeId());
+            generation = repository.save(generation);
+        }
+        worker.processJobAsync(generation.getId());
         return GenerationResponse.from(generation);
     }
 
@@ -36,43 +79,36 @@ public class AiGenerationService {
 
     @Transactional
     public GenerationResponse retry(Long userId, Long generationId) {
-        AiGeneration generation = owned(userId, generationId);
-        if (generation.getStatus() != AiGeneration.Status.FAILED) {
+        AiGeneration current = owned(userId, generationId);
+        if (current.getStatus() != AiGeneration.Status.FAILED) {
             throw ApiException.conflict("AI_RETRY_NOT_ALLOWED", "Only failed generations can be retried.");
         }
-        generation.retry();
-        repository.save(generation);
-        schedule(generation.getId());
-        return GenerationResponse.from(generation);
+
+        // Atomic retry update tại DB level để triệt tiêu race condition khi spam retry
+        int updatedRows = repository.atomicRetry(generationId, userId, Instant.now());
+        if (updatedRows == 0) {
+            throw ApiException.conflict("AI_RETRY_CONFLICT", "Job is not in FAILED state or is already being retried.");
+        }
+
+        AiGeneration updated = owned(userId, generationId);
+        worker.processJobAsync(updated.getId());
+        return GenerationResponse.from(updated);
     }
 
-    private void schedule(Long id) {
-        CompletableFuture.delayedExecutor(250, TimeUnit.MILLISECONDS).execute(() -> processing(id));
-        CompletableFuture.delayedExecutor(2, TimeUnit.SECONDS).execute(() -> complete(id));
-    }
-
-    void processing(Long id) {
-        repository.findById(id).ifPresent(generation -> {
-            if (generation.getStatus() == AiGeneration.Status.PENDING) {
-                generation.processing();
-                repository.save(generation);
-            }
-        });
-    }
-
-    void complete(Long id) {
-        repository.findById(id).ifPresent(generation -> {
-            if (generation.getStatus() != AiGeneration.Status.PROCESSING) return;
-            if (generation.getStylePrompt().toLowerCase().contains("[fail]")) {
-                generation.fail("Mock provider failure requested by prompt.");
-            } else {
-                String result = generation.getOriginalMediaUrl() == null
-                        ? "https://picsum.photos/seed/loccoc-" + id + "/1024/1024"
-                        : generation.getOriginalMediaUrl() + (generation.getOriginalMediaUrl().contains("?") ? "&" : "?") + "aiGeneration=" + id;
-                generation.success(result);
-            }
-            repository.save(generation);
-        });
+    public VerifyResponse verifyForPublication(Long userId, Long generationId) {
+        var opt = repository.findByIdAndUserId(generationId, userId);
+        if (opt.isEmpty()) {
+            return VerifyResponse.invalid("AI generation not found or does not belong to user.");
+        }
+        AiGeneration gen = opt.get();
+        if (gen.getStatus() != AiGeneration.Status.SUCCESS) {
+            return VerifyResponse.invalid("AI generation status is not SUCCESS (current: " + gen.getStatus() + ").");
+        }
+        return VerifyResponse.valid(
+                gen.getGeneratedMediaUrl(),
+                gen.getWidgetThumbnailUrl(),
+                gen.getOriginalMediaUrl()
+        );
     }
 
     private AiGeneration owned(Long userId, Long id) {
@@ -87,25 +123,64 @@ public class AiGenerationService {
         }
     }
 
-    private String normalize(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+    private String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
 
     public record CreateGenerationRequest(
             @Size(max = 2048) String originalMediaUrl,
             @NotNull @Size(min = 1, max = 1000) String stylePrompt,
-            @NotNull AiGeneration.Type generationType
+            @NotNull AiGeneration.Type generationType,
+            @Size(max = 64) String clientRequestId
     ) {}
 
     public record GenerationResponse(
-            Long id, Long userId, String originalMediaUrl, String stylePrompt, String generatedMediaUrl,
-            String generationType, String status, String errorMessage, Instant createdAt, Instant completedAt
+            Long id,
+            Long userId,
+            String originalMediaUrl,
+            String stylePrompt,
+            String generatedMediaUrl,
+            String widgetThumbnailUrl,
+            String generationType,
+            String status,
+            String errorMessage,
+            Instant createdAt,
+            Instant completedAt,
+            int retryCount,
+            String mockChargeId
     ) {
-        static GenerationResponse from(AiGeneration generation) {
+        public static GenerationResponse from(AiGeneration generation) {
             return new GenerationResponse(
-                    generation.getId(), generation.getUserId(), generation.getOriginalMediaUrl(),
-                    generation.getStylePrompt(), generation.getGeneratedMediaUrl(),
-                    generation.getGenerationType().name(), generation.getStatus().name(),
-                    generation.getErrorMessage(), generation.getCreatedAt(), generation.getCompletedAt()
+                    generation.getId(),
+                    generation.getUserId(),
+                    generation.getOriginalMediaUrl(),
+                    generation.getStylePrompt(),
+                    generation.getGeneratedMediaUrl(),
+                    generation.getWidgetThumbnailUrl(),
+                    generation.getGenerationType().name(),
+                    generation.getStatus().name(),
+                    generation.getErrorMessage(),
+                    generation.getCreatedAt(),
+                    generation.getCompletedAt(),
+                    generation.getRetryCount(),
+                    generation.getMockChargeId()
             );
+        }
+    }
+
+    public record VerifyResponse(
+            boolean valid,
+            String generatedMediaUrl,
+            String widgetThumbnailUrl,
+            String originalMediaUrl,
+            String errorMessage
+    ) {
+        public static VerifyResponse valid(String mediaUrl, String widgetThumbnailUrl, String originalMediaUrl) {
+            return new VerifyResponse(true, mediaUrl, widgetThumbnailUrl, originalMediaUrl, null);
+        }
+
+        public static VerifyResponse invalid(String error) {
+            return new VerifyResponse(false, null, null, null, error);
         }
     }
 }

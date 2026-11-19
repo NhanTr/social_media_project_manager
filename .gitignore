@@ -37,3 +37,8 @@ minio_data/
 
 # Agent task ledgers and review scratch
 .superpowers/
+
+# Python cache
+__pycache__/
+*.pyc
+

@@ -2,6 +2,7 @@ package com.nhantr.post_service.service;
 
 import com.nhantr.common.api.ApiException;
 import com.nhantr.common.api.PageResponse;
+import com.nhantr.post_service.client.AiClient;
 import com.nhantr.post_service.client.IdentityClient;
 import com.nhantr.post_service.client.NotificationClient;
 import com.nhantr.post_service.client.SocialClient;
@@ -12,6 +13,7 @@ import com.nhantr.post_service.repository.PublicationLock;
 import com.nhantr.post_service.repository.PostRepository;
 import com.nhantr.post_service.storage.MediaCleanupService;
 import jakarta.validation.constraints.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class PostService {
     private final MediaCleanupService cleanup;
     private final MediaUploadRepository uploads;
     private final PublicationLock publicationLock;
+    private final AiClient aiClient;
 
     public PostService(
             PostRepository repository,
@@ -44,6 +47,20 @@ public class PostService {
             MediaUploadRepository uploads,
             PublicationLock publicationLock
     ) {
+        this(repository, social, identity, notifications, cleanup, uploads, publicationLock, null);
+    }
+
+    @Autowired
+    public PostService(
+            PostRepository repository,
+            SocialClient social,
+            IdentityClient identity,
+            NotificationClient notifications,
+            MediaCleanupService cleanup,
+            MediaUploadRepository uploads,
+            PublicationLock publicationLock,
+            @Autowired(required = false) AiClient aiClient
+    ) {
         this.repository = repository;
         this.social = social;
         this.identity = identity;
@@ -51,6 +68,7 @@ public class PostService {
         this.cleanup = cleanup;
         this.uploads = uploads;
         this.publicationLock = publicationLock;
+        this.aiClient = aiClient;
     }
 
     @Transactional
@@ -96,11 +114,35 @@ public class PostService {
                 && request.durationSeconds() > 5) {
             throw ApiException.badRequest("GIF_TOO_LONG", "GIF duration must not exceed 5 seconds.");
         }
+        AiClient.VerifyResponse verify = null;
+        if (Boolean.TRUE.equals(request.aiGenerated())) {
+            if (request.aiGenerationId() == null) {
+                throw ApiException.badRequest("AI_GENERATION_ID_REQUIRED", "AI generated posts must specify aiGenerationId.");
+            }
+            if (aiClient != null) {
+                verify = aiClient.verify(userId, request.aiGenerationId());
+                if (verify == null || !verify.valid()) {
+                    String msg = (verify != null && verify.errorMessage() != null)
+                            ? verify.errorMessage()
+                            : "AI generation is not valid or not completed.";
+                    throw ApiException.badRequest("AI_GENERATION_INVALID", msg);
+                }
+                boolean matchesGenerated = Objects.equals(request.mediaUrl(), verify.generatedMediaUrl());
+                boolean matchesOriginal = Objects.equals(request.mediaUrl(), verify.originalMediaUrl());
+                if (!matchesGenerated && !matchesOriginal) {
+                    throw ApiException.badRequest("AI_MEDIA_URL_MISMATCH",
+                            "Post mediaUrl does not match AI generation result or original media.");
+                }
+            }
+        }
+        String resolvedThumbnailUrl = request.thumbnailUrl() != null
+                ? request.thumbnailUrl()
+                : (verify != null ? verify.widgetThumbnailUrl() : null);
         Post post = new Post(
                 userId,
                 request.mediaType(),
                 request.mediaUrl(),
-                request.thumbnailUrl(),
+                resolvedThumbnailUrl,
                 request.mediaWidth(),
                 request.mediaHeight(),
                 request.fileSizeBytes(),

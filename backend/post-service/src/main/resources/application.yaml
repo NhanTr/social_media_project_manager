@@ -28,6 +28,8 @@ clients:
     base-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
   notification:
     base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8084}
+  ai:
+    base-url: ${AI_SERVICE_URL:http://localhost:8086}
 storage:
   endpoint: ${MINIO_URL:http://localhost:9000}
   public-url: ${MINIO_PUBLIC_URL:http://localhost:9000}
