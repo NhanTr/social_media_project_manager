@@ -52,7 +52,7 @@
 - [ ] LC-S4-01 Subscription Service Tier và Entitlement
 - [ ] LC-S4-02 Payment Sandbox Checkout và Webhook
 - [ ] LC-S4-03 Flutter Paywall và Quản lý Tier
-- [ ] LC-S4-04 Admin Service Report và Moderation
+- [x] LC-S4-04 Admin Service Report và Moderation
 
 ### Sprint 5
 
@@ -661,7 +661,17 @@ Mỗi task dưới đây là một Trello card. ID task phải xuất hiện tro
 - Mọi quyết định có actor time note
 **Bằng chứng kiểm thử.** Authorization tests; Workflow integration test; Failure compensation test when downstream unavailable.
 
-**Commit gợi ý.** feat(admin): add report queue moderation and audit
+**Commit gợi ý.** feat(admin): LC-S4-04 add report moderation and audit
+
+**Báo cáo triển khai & Nghiệm thu LC-S4-04:**
+- Đã bổ sung migration `V9__moderation_audit_and_anti_spam.sql` với bảng `moderation_audit_logs` bất biến và 2 Partial Unique Indexes (`uq_reports_pending_post`, `uq_reports_pending_user`) chống spam báo cáo trùng mục tiêu khi đang PENDING.
+- Hoàn thiện nghiệp vụ validation: Chặn tự báo cáo tài khoản chính mình (`SELF_REPORT_INVALID`), chặn tự báo cáo bài viết của chính mình (`SELF_POST_REPORT_INVALID`), và chặn báo cáo các bài viết đã `DELETED` hoặc `HIDDEN` (`POST_ALREADY_INACTIVE`).
+- Triển khai cơ chế giải quyết nguyên tử `atomicResolve` tại tầng DB chống xung đột tương tranh giữa các Admin, đồng thời tự động Cascade Resolution gộp giải quyết tất cả các report PENDING khác cùng target và gửi thông báo tới toàn bộ reporters.
+- Bổ sung hành động gửi cảnh cáo thực tế cho `WARN_USER` tới người vi phạm qua `notificationClient`.
+- Đảm bảo tính toàn vẹn giao dịch phân tán: Gọi downstream sang Post/Identity trước, rollback an toàn khi downstream lỗi (không lưu trạng thái RESOLVED ảo).
+- Bổ sung phân trang an toàn `listWithFilters` (tránh OOM) và API tra cứu Audit Log cho Admin.
+- Toàn bộ 15 bài test của `moderation-service` và toàn bộ test suite backend chạy PASS 100%. Checkstyle đạt 0 lỗi.
+
 
 ### Sprint 5 Hardening và phát hành MVP
 

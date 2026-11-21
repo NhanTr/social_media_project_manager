@@ -26,11 +26,23 @@ public class NotificationClient {
         try {
             client.post().uri("/internal/v1/notifications/report-result")
                     .header("X-Internal-Api-Key", internalApiKey)
-                    .header("Idempotency-Key", UUID.nameUUIDFromBytes(("report:" + reportId).getBytes()).toString())
-                    .body(new Event(reporterId, null, reportId, null, body))
+                    .header("Idempotency-Key", UUID.nameUUIDFromBytes(("report:" + reportId + ":" + reporterId).getBytes()).toString())
+                    .body(new Event(reporterId, null, reportId, "Báo cáo đã được xử lý", body))
                     .retrieve().toBodilessEntity();
         } catch (RuntimeException exception) {
-            log.warn("Cannot create REPORT_RESULT notification: {}", exception.getMessage());
+            log.warn("Cannot create REPORT_RESULT notification for reporter {}: {}", reporterId, exception.getMessage());
+        }
+    }
+
+    public void notifyUser(Long userId, Long referenceId, String body) {
+        try {
+            client.post().uri("/internal/v1/notifications/report-result")
+                    .header("X-Internal-Api-Key", internalApiKey)
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .body(new Event(userId, null, referenceId, "Thông báo kiểm duyệt", body))
+                    .retrieve().toBodilessEntity();
+        } catch (RuntimeException exception) {
+            log.warn("Cannot create moderation warning notification for user {}: {}", userId, exception.getMessage());
         }
     }
 
