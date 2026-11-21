@@ -38,7 +38,7 @@
 - [ ] LC-S2-01 Post Service Media Post và Friends Only Feed
 - [ ] LC-S2-02 Flutter Capture Composer và Upload
 - [ ] LC-S2-03 Flutter Feed Filter và Media Detail
-- [ ] LC-S2-04 Post Service AI Generation Mock và entitlement hook
+- [x] LC-S2-04 Post Service AI Generation Mock và entitlement hook
 
 ### Sprint 3
 
@@ -445,7 +445,16 @@ Mỗi task dưới đây là một Trello card. ID task phải xuất hiện tro
 - Provider adapter có thể thay mà không đổi API public
 **Bằng chứng kiểm thử.** State transition tests; Contract test entitlement; Failure and timeout test.
 
-**Commit gợi ý.** feat(post-ai): add mock generation job and entitlement boundary
+**Commit gợi ý.** feat(post-ai): LC-S2-04 add mock generation and entitlement boundary
+
+**Báo cáo triển khai & Nghiệm thu LC-S2-04:**
+- Đã bổ sung migration `V9__ai_generation_lease_and_idempotency.sql` hỗ trợ `client_request_id` (idempotency), `lease_owner`, `leased_until`, `retry_count`, `mock_charge_id`, và `widget_thumbnail_url`.
+- Thiết kế `SubscriptionEntitlementClient` theo Hexagonal Architecture với cơ chế fail-closed và 1 mock charge cho toàn bộ vòng đời generation (retry không phát sinh thêm charge).
+- Tách `AiProvider` SPI với `DeterministicMockAiProvider` hỗ trợ xử lý deterministic, cờ mô phỏng lỗi `[fail]` và timeout `[timeout]`, tự sinh `widget_thumbnail_url` 1:1 square (<200KB) thân thiện với Widget iOS/Android.
+- Triển khai `AiGenerationWorker` với cơ chế worker lease và recovery cho stale jobs.
+- Triển khai `InternalAiGenerationController` và `AiClient` trong `post-service` để Post Service xác thực tính toàn vẹn của kết quả AI trước khi publish, hỗ trợ fallback sang media gốc khi AI lỗi.
+- Đã viết 17 bài test mới (12 test ở `ai-service` bao gồm concurrency, lifecycle, entitlement boundary; 5 test ở `post-service` cho AI verification và widget thumbnail). Toàn bộ 43 test liên quan và toàn bộ test suite backend chạy PASS 100%. Checkstyle đạt 0 lỗi.
+
 
 ### Sprint 3 Chat và Notification
 
