@@ -1,0 +1,1363 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "LocCoc S3-02 / S3-04 mobile-backend handoff (DRAFT TARGET)",
+    "version": "0.1.0",
+    "description": "Reviewed 2026-11-06. Baseline origin/dev eefc3a5; backend branches b8e6cb4 (chat), 0d17536 (notification), not merged. This is a reviewable target contract, NOT proof endpoints/behaviors are deployed. See s3-mobile-api-contract.md for current/proposed differences, STOMP, push and acceptance checks. No runtime changes in this branch."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local Gateway; target capabilities require backend work/merge."
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/v1/conversations": {
+      "get": {
+        "operationId": "listConversations",
+        "summary": "Current unpaginated array, not PageResponse; no preview/profile/unread metadata.",
+        "description": "Current unpaginated array, not PageResponse; no preview/profile/unread metadata.",
+        "x-implementation-status": "dev",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Conversation"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/conversations/{friendId}": {
+      "post": {
+        "operationId": "openConversation",
+        "summary": "Create or return a one-to-one conversation for unblocked friends; existing conversation also returns 201.",
+        "description": "Create or return a one-to-one conversation for unblocked friends; existing conversation also returns 201.",
+        "x-implementation-status": "dev",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "friendId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/conversations/{id}/messages": {
+      "get": {
+        "operationId": "listMessages",
+        "summary": "History in descending (sentAt,id) order. Target: preserve full database timestamp precision in opaque cursor.",
+        "description": "History in descending (sentAt,id) order. Target: preserve full database timestamp precision in opaque cursor.",
+        "x-implementation-status": "dev",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePage"
+                },
+                "example": {
+                  "items": [],
+                  "nextCursor": null,
+                  "hasNext": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque older-history cursor. Do not decode or construct."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/messages": {
+      "post": {
+        "operationId": "sendMessage",
+        "summary": "Target: atomic same-key replay including concurrent calls; changed payload returns 409 MESSAGE_REQUEST_CONFLICT. dev lacks clientMessageId; b8e6cb4 has sequential replay only.",
+        "description": "Target: atomic same-key replay including concurrent calls; changed payload returns 409 MESSAGE_REQUEST_CONFLICT. dev lacks clientMessageId; b8e6cb4 has sequential replay only.",
+        "x-implementation-status": "partial-branch-b8e6cb4-target-proposed",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessage"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{id}/delivered": {
+      "post": {
+        "operationId": "deliveredMessages",
+        "summary": "Target: update only incoming messages through lastMessageId in server order; bodyless legacy calls remain accepted but are unsafe for the new Flutter read/view flow.",
+        "description": "Target: update only incoming messages through lastMessageId in server order; bodyless legacy calls remain accepted but are unsafe for the new Flutter read/view flow.",
+        "x-implementation-status": "proposed-watermark-existing-branch-b8e6cb4",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updated"
+                },
+                "example": {
+                  "updated": 1
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Receipt"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{id}/read": {
+      "post": {
+        "operationId": "readMessages",
+        "summary": "Target: update only incoming messages through lastMessageId in server order; bodyless legacy calls remain accepted but are unsafe for the new Flutter read/view flow.",
+        "description": "Target: update only incoming messages through lastMessageId in server order; bodyless legacy calls remain accepted but are unsafe for the new Flutter read/view flow.",
+        "x-implementation-status": "proposed-watermark-existing-dev",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updated"
+                },
+                "example": {
+                  "updated": 1
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Receipt"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "listNotifications",
+        "summary": "Newest first; target is an additive proposed field. Preserve full cursor timestamp precision.",
+        "description": "Newest first; target is an additive proposed field. Preserve full cursor timestamp precision.",
+        "x-implementation-status": "dev",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPage"
+                },
+                "example": {
+                  "items": [],
+                  "nextCursor": null,
+                  "hasNext": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque older-history cursor. Do not decode or construct."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications/unread-count": {
+      "get": {
+        "operationId": "getUnreadCount",
+        "summary": "Authoritative unread count for the authenticated user.",
+        "description": "Authoritative unread count for the authenticated user.",
+        "x-implementation-status": "branch-0d17536",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCount"
+                },
+                "example": {
+                  "count": 3
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {
+        "operationId": "readNotification",
+        "summary": "Owner only; target behavior: repeated read preserves original readAt.",
+        "description": "Owner only; target behavior: repeated read preserves original readAt.",
+        "x-implementation-status": "dev",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "post": {
+        "operationId": "readAllNotifications",
+        "summary": "Mark unread rows at execution time; refetch unread count after success; new arrivals may remain unread.",
+        "description": "Mark unread rows at execution time; refetch unread count after success; new arrivals may remain unread.",
+        "x-implementation-status": "dev",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updated"
+                },
+                "example": {
+                  "updated": 3
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/device-tokens": {
+      "post": {
+        "operationId": "registerDeviceToken",
+        "summary": "Register or rotate own device token; target requires ownership validation of oldToken. Production push remains deferred.",
+        "description": "Register or rotate own device token; target requires ownership validation of oldToken. Production push remains deferred.",
+        "x-implementation-status": "dev",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceToken"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/device-tokens/{token}": {
+      "delete": {
+        "operationId": "disableDeviceToken",
+        "summary": "Disable token belonging to current user before logout. URL-encode path token; redact tokens from access logs.",
+        "description": "Disable token belonging to current user before logout. URL-encode path token; redact tokens from access logs.",
+        "x-implementation-status": "dev",
+        "responses": {
+          "204": {
+            "description": "No content",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "ProblemDetail; see error matrix in the companion contract. Security-filter error shape must be verified through Gateway.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request trace identifier, also returned on errors.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "nullable": true
+          },
+          "fieldErrors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "code",
+          "requestId"
+        ]
+      },
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "userId1": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "userId2": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "userId1",
+          "userId2",
+          "lastMessageAt",
+          "createdAt"
+        ]
+      },
+      "SendMessage": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "GIF",
+              "SYSTEM"
+            ]
+          },
+          "clientMessageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Target requirement for retry-safe clients. Missing on dev; optional on b8e6cb4. Keep unchanged across REST/STOMP retries."
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 5000,
+            "nullable": true
+          },
+          "mediaUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "nullable": true
+          }
+        },
+        "required": [
+          "conversationId",
+          "messageType",
+          "clientMessageId"
+        ],
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "messageType": {
+                "enum": [
+                  "TEXT",
+                  "SYSTEM"
+                ]
+              },
+              "content": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "required": [
+              "messageType",
+              "content"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "messageType": {
+                "enum": [
+                  "IMAGE",
+                  "GIF"
+                ]
+              },
+              "mediaUrl": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "required": [
+              "messageType",
+              "mediaUrl"
+            ]
+          }
+        ]
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "conversationId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "senderId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "clientMessageId": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true,
+            "x-implementation-status": "branch-b8e6cb4"
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "mediaUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "GIF",
+              "SYSTEM"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SENT",
+              "DELIVERED",
+              "READ"
+            ]
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "senderId",
+          "content",
+          "mediaUrl",
+          "thumbnailUrl",
+          "messageType",
+          "status",
+          "sentAt",
+          "deliveredAt",
+          "readAt"
+        ]
+      },
+      "Receipt": {
+        "type": "object",
+        "properties": {
+          "lastMessageId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "description": "PROPOSED: highest incoming message actually received/viewed. Resolve server ordering by (sentAt,id), never compare IDs alone."
+          }
+        },
+        "required": [
+          "lastMessageId"
+        ]
+      },
+      "Updated": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "updated"
+        ]
+      },
+      "UnreadCount": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "NotificationTarget": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FRIEND_REQUEST",
+              "PROFILE",
+              "POST",
+              "CONVERSATION",
+              "SUBSCRIPTION",
+              "REPORT"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "messageId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "description": "Optional focus message belonging to CONVERSATION target."
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ]
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "actorUserId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "description": "Current: FRIEND_REQUEST, FRIEND_ACCEPT, NEW_POST, CHAT_MESSAGE, REPORT_RESULT. Proposed: SUBSCRIPTION_UPDATED. Unknown values must use fallback."
+          },
+          "referenceId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "target": {
+            "$ref": "#/components/schemas/NotificationTarget",
+            "x-implementation-status": "proposed"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "actorUserId",
+          "type",
+          "referenceId",
+          "title",
+          "body",
+          "read",
+          "createdAt",
+          "readAt"
+        ]
+      },
+      "DeviceTokenRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "IOS",
+              "ANDROID",
+              "WEB"
+            ]
+          },
+          "oldToken": {
+            "type": "string",
+            "maxLength": 4096,
+            "nullable": true,
+            "x-implementation-status": "branch-0d17536"
+          }
+        },
+        "required": [
+          "token",
+          "platform"
+        ]
+      },
+      "DeviceToken": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "token": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "IOS",
+              "ANDROID",
+              "WEB"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "token",
+          "platform",
+          "active"
+        ]
+      },
+      "MessagePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hasNext"
+        ]
+      },
+      "NotificationPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hasNext"
+        ]
+      },
+      "ChatReceiptEvent": {
+        "type": "object",
+        "description": "Mixed conversation topic receipt. lastMessageId is PROPOSED and absent on b8e6cb4.",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "participantId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "receiptType": {
+            "type": "string",
+            "enum": [
+              "DELIVERED",
+              "READ"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "lastMessageId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "x-implementation-status": "proposed"
+          }
+        },
+        "required": [
+          "conversationId",
+          "participantId",
+          "receiptType",
+          "timestamp",
+          "updatedCount"
+        ]
+      },
+      "NotificationEvent": {
+        "type": "object",
+        "description": "Internal service-only event. X-Internal-Api-Key and stable Idempotency-Key required by target contract. target is proposed.",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "actorUserId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "nullable": true
+          },
+          "referenceId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 255
+          },
+          "body": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 2000
+          },
+          "target": {
+            "$ref": "#/components/schemas/NotificationTarget",
+            "x-implementation-status": "proposed"
+          }
+        },
+        "required": [
+          "userId"
+        ]
+      },
+      "NotificationPushData": {
+        "type": "object",
+        "x-implementation-status": "proposed",
+        "description": "Proposed FCM data payload. All values are strings. Device token is transport metadata, never a deep-link field.",
+        "properties": {
+          "notificationId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "type": {
+            "type": "string"
+          },
+          "targetKind": {
+            "type": "string",
+            "enum": [
+              "FRIEND_REQUEST",
+              "PROFILE",
+              "POST",
+              "CONVERSATION",
+              "SUBSCRIPTION",
+              "REPORT"
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "messageId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          }
+        },
+        "required": [
+          "notificationId",
+          "type",
+          "targetKind",
+          "targetId"
+        ]
+      }
+    }
+  }
+}
